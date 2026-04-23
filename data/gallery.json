@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "rooms": [
+    {
+      "id": "room-01",
+      "name": "Room I — Inaugural Hall",
+      "theme": "The opening room of the gallery. Where it all begins.",
+      "images": []
+    }
+  ]
+}

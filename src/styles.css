@@ -1,0 +1,44 @@
+:root {
+  --bg: #f7f4ee;
+  --ink: #1c1c1c;
+  --muted: #5b5b5b;
+  --accent: #8b1a1a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+.layout { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+.site-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 24px 0; border-bottom: 1px solid #ddd;
+}
+.brand { font-size: 1.5rem; font-weight: bold; text-decoration: none; color: var(--ink); }
+nav a { margin-left: 20px; color: var(--accent); text-decoration: none; }
+.lede { color: var(--muted); font-style: italic; }
+.room-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px; margin-top: 32px;
+}
+.room-card {
+  display: block; background: white; border: 1px solid #e0d8c8;
+  text-decoration: none; color: inherit; overflow: hidden;
+}
+.room-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.room-meta { padding: 16px; }
+.room-meta h2 { margin: 0 0 4px; font-size: 1.1rem; }
+.image-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 32px; margin-top: 24px;
+}
+.piece { margin: 0; background: white; padding: 16px; border: 1px solid #e0d8c8; }
+.piece img { width: 100%; display: block; }
+.piece figcaption { padding-top: 12px; }
+.artist-note { color: var(--muted); }
+.critique { border-left: 3px solid var(--accent); padding-left: 12px; font-style: italic; }
+.critic-column article { padding: 24px 0; border-bottom: 1px solid #ddd; }
+.suggestion { color: var(--muted); }
+footer { margin: 64px 0 32px; color: var(--muted); text-align: center; font-size: 0.9rem; }
