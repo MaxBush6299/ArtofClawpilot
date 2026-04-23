@@ -47,8 +47,8 @@ resource swa 'Microsoft.Web/staticSites@2024-04-01' = {
   name: swaName
   location: location
   sku: {
-    name: 'Free'
-    tier: 'Free'
+    name: 'Standard'
+    tier: 'Standard'
   }
   identity: {
     type: 'SystemAssigned'
