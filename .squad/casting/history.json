@@ -1,0 +1,14 @@
+{
+  "universe_usage_history": [],
+  "assignment_cast_snapshots": {
+    "legacy-migration-2026-04-23": {
+      "universe": null,
+      "agents": {
+        "artist": "Artist",
+        "critic": "Critic",
+        "curator": "Curator"
+      },
+      "created_at": "2026-04-23T00:00:00Z"
+    }
+  }
+}

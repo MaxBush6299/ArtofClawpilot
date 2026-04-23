@@ -1,0 +1,25 @@
+{
+  "agents": {
+    "artist": {
+      "persistent_name": "Artist",
+      "universe": null,
+      "created_at": "2026-04-23T00:00:00Z",
+      "legacy_named": true,
+      "status": "active"
+    },
+    "critic": {
+      "persistent_name": "Critic",
+      "universe": null,
+      "created_at": "2026-04-23T00:00:00Z",
+      "legacy_named": true,
+      "status": "active"
+    },
+    "curator": {
+      "persistent_name": "Curator",
+      "universe": null,
+      "created_at": "2026-04-23T00:00:00Z",
+      "legacy_named": true,
+      "status": "active"
+    }
+  }
+}
