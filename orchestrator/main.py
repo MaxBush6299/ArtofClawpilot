@@ -134,7 +134,7 @@ def parse_args() -> RuntimeArgs:
     )
     parser.add_argument(
         "--image-api-version",
-        default=os.environ.get("FOUNDRY_IMAGE_API_VERSION"),
+        default=os.environ.get("FOUNDRY_IMAGE_API_VERSION") or "2025-04-01-preview",
     )
     parser.add_argument("--image-width", type=int, default=int(os.environ.get("FOUNDRY_IMAGE_WIDTH", "1024")))
     parser.add_argument("--image-height", type=int, default=int(os.environ.get("FOUNDRY_IMAGE_HEIGHT", "1024")))

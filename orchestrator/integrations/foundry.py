@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib import error, request
+from urllib.parse import urlsplit, urlunsplit
 
 from ..contracts import (
     ArtistPromptPackage,
@@ -306,13 +307,24 @@ def _output_item_count(payload: dict[str, Any]) -> int | None:
     return None
 
 
+def _mai_image_endpoint(endpoint: str) -> str:
+    parsed = urlsplit(endpoint.rstrip("/"))
+    path = parsed.path or ""
+    if path.startswith("/api/projects/"):
+        path = ""
+    elif path.endswith("/mai/v1/images/generations"):
+        path = path[: -len("/mai/v1/images/generations")]
+    return urlunsplit((parsed.scheme, parsed.netloc, path.rstrip("/"), "", ""))
+
+
 class FoundryImageClient:
     def __init__(self, config: ImageModelConfig, token_provider: BearerTokenProvider | None = None):
         self._config = config
         self._token_provider = token_provider
 
     def generate_image(self, prompt_package: ArtistPromptPackage) -> ImageGenerationResult:
-        url = f"{self._config.endpoint.rstrip('/')}/mai/v1/images/generations"
+        endpoint = _mai_image_endpoint(self._config.endpoint)
+        url = f"{endpoint}/mai/v1/images/generations"
         if self._config.api_version:
             url = f"{url}?api-version={self._config.api_version}"
         prompt = (prompt_package.reviewed_prompt or "").strip()
@@ -355,7 +367,7 @@ class FoundryImageClient:
             deployment=self._config.deployment,
             response_metadata={
                 "operation": "mai_image_generation",
-                "endpoint": self._config.endpoint.rstrip("/"),
+                "endpoint": endpoint,
                 "deployment": self._config.deployment,
                 "providerModel": raw.get("model") or self._config.deployment,
                 "request": {
