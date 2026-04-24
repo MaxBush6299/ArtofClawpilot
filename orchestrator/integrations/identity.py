@@ -19,9 +19,10 @@ class ContainerAppsManagedIdentityTokenProvider:
     def get_token(self, scope: str) -> str:
         endpoint = os.environ.get("IDENTITY_ENDPOINT")
         header = os.environ.get("IDENTITY_HEADER")
+        resource = scope.removesuffix("/.default")
         if endpoint and header:
             query = {
-                "resource": scope,
+                "resource": resource,
                 "api-version": "2019-08-01",
             }
             if self.client_id:
@@ -42,7 +43,6 @@ class ContainerAppsManagedIdentityTokenProvider:
         fallback = os.environ.get("AZURE_ACCESS_TOKEN")
         if fallback:
             return fallback
-        resource = scope.removesuffix("/.default")
         azure_cli = shutil.which("az") or shutil.which("az.cmd")
         try:
             completed = subprocess.run(

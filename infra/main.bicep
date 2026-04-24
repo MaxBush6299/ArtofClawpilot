@@ -260,6 +260,10 @@ var baseJobEnvVars = concat([
     value: '1'
   }
   {
+    name: 'PYTHONDONTWRITEBYTECODE'
+    value: '1'
+  }
+  {
     name: 'HOSTED_PUSH_CHANGES'
     value: hostedPushChanges ? 'true' : 'false'
   }
