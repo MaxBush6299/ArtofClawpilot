@@ -1,39 +1,23 @@
-# Work Routing
+# Routing
 
-How to decide who handles what in the Art of Clawpilot daily loop.
+## Default Ownership
 
-## Routing Table
+- Stan owns architecture, design docs, cross-cutting changes, and final review.
+- Wendy owns React, Vite, routes, styling, and gallery UX.
+- Kyle owns Python orchestration, daily-run logic, Foundry integration, and data persistence contracts.
+- Tolkien owns Azure infrastructure, Container Apps Jobs, Key Vault access, deployment wiring, and hosted runtime boundaries.
+- Butters owns test strategy, edge cases, acceptance coverage, and reviewer gating.
+- Scribe owns session logs, decision consolidation, and team memory updates.
+- Ralph owns backlog monitoring, GitHub issue status, and keeping work moving.
 
-| Work Type | Route To | Examples |
-|-----------|----------|----------|
-| Gallery planning | Curator | Pick the target room, open a new room, set the next commission, retheme a room |
-| Image critique | Critic | Review the newest piece, write the daily column, suggest the next direction |
-| Image generation | Artist | Turn the brief into a single prompt, title, and artist note; call `scripts/generate-image.mjs` |
-| Daily orchestration | Ralph | Sequence the ritual, keep the board moving, decide what runs next |
-| Session logging | Scribe | Record migrations, summarize decisions, keep durable notes |
+## Multi-Agent Routes
 
-## Issue Routing
+- Hosted daily-run architecture: Stan + Kyle + Tolkien + Butters
+- New gallery experience work: Wendy + Kyle + Butters
+- Deployment or Azure auth changes: Tolkien + Kyle + Butters
+- Issue triage and backlog management: Stan + Ralph
 
-| Label | Action | Who |
-|-------|--------|-----|
-| `squad` | Triage the work and route it to the correct specialist | Ralph |
-| `squad:artist` | Pick up image generation work | Artist |
-| `squad:critic` | Pick up critique and evaluation work | Critic |
-| `squad:curator` | Pick up planning, curation, and gallery-structure work | Curator |
+## Reviewer Rules
 
-### How Issue Assignment Works
-
-1. When work arrives without a clear owner, **Ralph** triages it and routes it to the Artist, Critic, or Curator.
-2. **Curator** owns planning and data-shape questions around rooms, themes, and the next brief.
-3. **Critic** owns feedback quality, critique tone, and the daily suggestion to the artist.
-4. **Artist** owns prompt craft and the generated piece, but never bypasses `scripts/generate-image.mjs`.
-5. **Scribe** records any durable process change or migration after the substantive work is done.
-
-## Rules
-
-1. Start from the daily ritual and route to the agent who directly owns that step.
-2. Use **Curator** first for room selection and commissions, even if another agent raised the idea.
-3. Use **Critic** before changing critique schemas or image commentary conventions.
-4. Use **Artist** only for the single daily piece and its immediate metadata.
-5. Run **Scribe** after meaningful Squad changes or workflow migrations.
-6. Use **Ralph** when the task spans multiple agents or needs sequencing rather than authorship.
+- Stan and Butters are reviewer-capable members.
+- Rejected artifacts must be revised by a different agent than the original author.

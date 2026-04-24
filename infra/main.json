@@ -1,0 +1,687 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "5585058236489497111"
+    }
+  },
+  "parameters": {
+    "namePrefix": {
+      "type": "string",
+      "defaultValue": "artclaw",
+      "minLength": 3,
+      "maxLength": 8,
+      "metadata": {
+        "description": "Short prefix for resource names. Lowercase, 3-8 chars."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus2",
+      "metadata": {
+        "description": "Azure region for all resources."
+      }
+    },
+    "repositoryUrl": {
+      "type": "string",
+      "defaultValue": "https://github.com/MaxBush6299/ArtofClawpilot",
+      "metadata": {
+        "description": "GitHub repository URL for the SWA build integration."
+      }
+    },
+    "branch": {
+      "type": "string",
+      "defaultValue": "main",
+      "metadata": {
+        "description": "Branch the SWA should track."
+      }
+    },
+    "repositoryToken": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "GitHub PAT or deployment token for the SWA. Leave empty if you will configure deployment after creation."
+      }
+    },
+    "foundryResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of the existing Foundry / Azure AI Services account hosting the hosted models."
+      }
+    },
+    "foundryReasoningEndpoint": {
+      "type": "string",
+      "defaultValue": "https://example.openai.azure.com",
+      "metadata": {
+        "description": "Azure OpenAI-compatible endpoint URL for the hosted reasoning deployment. Stored in Key Vault and injected into the job."
+      }
+    },
+    "foundryReasoningDeploymentName": {
+      "type": "string",
+      "defaultValue": "grok-4-20-reasoning",
+      "metadata": {
+        "description": "Deployment name for the hosted reasoning model. Stored in Key Vault and injected into the job."
+      }
+    },
+    "foundryReasoningApiVersion": {
+      "type": "string",
+      "defaultValue": "2024-10-21",
+      "metadata": {
+        "description": "API version for the hosted reasoning deployment. Injected into the job as runtime config."
+      }
+    },
+    "foundryImageEndpoint": {
+      "type": "string",
+      "defaultValue": "https://example.services.ai.azure.com",
+      "metadata": {
+        "description": "MAI image-generation endpoint URL for the hosted image deployment. Stored in Key Vault and injected into the job."
+      }
+    },
+    "foundryImageDeploymentName": {
+      "type": "string",
+      "defaultValue": "mai-image-2e",
+      "metadata": {
+        "description": "Deployment name for the hosted image model. Stored in Key Vault and injected into the job."
+      }
+    },
+    "jobImage": {
+      "type": "string",
+      "defaultValue": "ghcr.io/maxbush6299/artofclawpilot-runner:latest",
+      "metadata": {
+        "description": "Container image to execute in the hosted daily runner job."
+      }
+    },
+    "jobTriggerType": {
+      "type": "string",
+      "defaultValue": "Manual",
+      "allowedValues": [
+        "Manual",
+        "Schedule"
+      ],
+      "metadata": {
+        "description": "Trigger mode for the hosted daily runner job. Keep Manual until hosted smoke proof passes."
+      }
+    },
+    "jobScheduleCron": {
+      "type": "string",
+      "defaultValue": "0 7 * * *",
+      "metadata": {
+        "description": "Cron expression for the scheduled daily runner. Azure Container Apps Jobs evaluate the schedule in UTC."
+      }
+    },
+    "jobCpu": {
+      "type": "string",
+      "defaultValue": "0.5",
+      "metadata": {
+        "description": "vCPU allocated to the hosted daily runner container."
+      }
+    },
+    "jobMemory": {
+      "type": "string",
+      "defaultValue": "1Gi",
+      "metadata": {
+        "description": "Memory allocated to the hosted daily runner container."
+      }
+    },
+    "jobReplicaTimeout": {
+      "type": "int",
+      "defaultValue": 1800,
+      "metadata": {
+        "description": "Timeout, in seconds, for each job replica."
+      }
+    },
+    "jobReplicaRetryLimit": {
+      "type": "int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "Retry attempts for a failed job replica before the execution fails."
+      }
+    },
+    "containerRegistryServer": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional Azure Container Registry login server for managed-identity image pulls."
+      }
+    },
+    "containerRegistryResourceId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional resource ID of the Azure Container Registry that hosts the job image. When provided, the job identity receives AcrPull."
+      }
+    },
+    "githubOwner": {
+      "type": "string",
+      "defaultValue": "MaxBush6299",
+      "metadata": {
+        "description": "GitHub owner that the hosted runner will clone and push to."
+      }
+    },
+    "githubRepo": {
+      "type": "string",
+      "defaultValue": "ArtofClawpilot",
+      "metadata": {
+        "description": "GitHub repository name that the hosted runner will clone and push to."
+      }
+    },
+    "githubBranch": {
+      "type": "string",
+      "defaultValue": "main",
+      "metadata": {
+        "description": "GitHub branch that the hosted runner writes to."
+      }
+    },
+    "githubAppId": {
+      "type": "string",
+      "defaultValue": "replace-me",
+      "metadata": {
+        "description": "GitHub App ID used by the hosted runner. Stored in Key Vault."
+      }
+    },
+    "githubAppInstallationId": {
+      "type": "string",
+      "defaultValue": "replace-me",
+      "metadata": {
+        "description": "GitHub App installation ID used by the hosted runner. Stored in Key Vault."
+      }
+    },
+    "githubAppPrivateKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "GitHub App private key PEM used by the hosted runner. Stored in Key Vault."
+      }
+    },
+    "gitAuthorName": {
+      "type": "string",
+      "defaultValue": "Art of Clawpilot Bot",
+      "metadata": {
+        "description": "Default git author name for hosted commits."
+      }
+    },
+    "gitAuthorEmail": {
+      "type": "string",
+      "defaultValue": "artofclawpilot-bot@users.noreply.github.com",
+      "metadata": {
+        "description": "Default git author email for hosted commits."
+      }
+    },
+    "hostedRunnerCommand": {
+      "type": "string",
+      "defaultValue": "python3 -m orchestrator.main --repo-root \"$REPO_WORKSPACE\" --run-date \"$RUN_DATE_UTC\"",
+      "metadata": {
+        "description": "Optional command executed inside the fresh clone before any commit/push step."
+      }
+    },
+    "hostedRunDateOverride": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional fixed UTC run date injected into the hosted runner. Useful for hosted smoke and idempotency replay."
+      }
+    },
+    "hostedPushChanges": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Whether the hosted bootstrap should push changes when the runner command mutates the clone."
+      }
+    }
+  },
+  "variables": {
+    "suffix": "[uniqueString(resourceGroup().id, parameters('namePrefix'))]",
+    "swaName": "[format('{0}-swa-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "kvName": "[take(format('{0}kv{1}', parameters('namePrefix'), variables('suffix')), 24)]",
+    "workspaceName": "[format('{0}-logs-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "managedEnvironmentName": "[format('{0}-acae-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "jobIdentityName": "[format('{0}-job-mi-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "dailyJobName": "[format('{0}-daily-job-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "roleKeyVaultSecretsUser": "4633458b-17de-408a-b874-0445c86b69e6",
+    "roleCognitiveServicesUser": "a97b65f3-24c7-4388-baec-2e87135dc908",
+    "roleAcrPull": "7f951dda-4ed3-4680-a7ca-43fe172d538d",
+    "hasGitHubAppConfig": "[and(and(not(empty(parameters('githubAppPrivateKey'))), not(equals(parameters('githubAppId'), 'replace-me'))), not(equals(parameters('githubAppInstallationId'), 'replace-me')))]",
+    "jobIdentityMap": {
+      "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')))]": {}
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/staticSites",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('swaName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Standard"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "repositoryUrl": "[parameters('repositoryUrl')]",
+        "branch": "[parameters('branch')]",
+        "repositoryToken": "[if(empty(parameters('repositoryToken')), null(), parameters('repositoryToken'))]",
+        "buildProperties": {
+          "appLocation": "/",
+          "outputLocation": "dist",
+          "appBuildCommand": "npm run build"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[variables('kvName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "tenantId": "[subscription().tenantId]",
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "enableRbacAuthorization": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 7,
+        "enablePurgeProtection": true,
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'foundry-reasoning-endpoint')]",
+      "properties": {
+        "value": "[parameters('foundryReasoningEndpoint')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'foundry-image-endpoint')]",
+      "properties": {
+        "value": "[parameters('foundryImageEndpoint')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'foundry-endpoint')]",
+      "properties": {
+        "value": "[parameters('foundryImageEndpoint')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'foundry-reasoning-deployment-name')]",
+      "properties": {
+        "value": "[parameters('foundryReasoningDeploymentName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'foundry-reasoning-api-version')]",
+      "properties": {
+        "value": "[parameters('foundryReasoningApiVersion')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'foundry-image-deployment-name')]",
+      "properties": {
+        "value": "[parameters('foundryImageDeploymentName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'foundry-deployment-name')]",
+      "properties": {
+        "value": "[parameters('foundryImageDeploymentName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "condition": "[variables('hasGitHubAppConfig')]",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'github-app-id')]",
+      "properties": {
+        "value": "[parameters('githubAppId')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "condition": "[variables('hasGitHubAppConfig')]",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'github-app-installation-id')]",
+      "properties": {
+        "value": "[parameters('githubAppInstallationId')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "condition": "[variables('hasGitHubAppConfig')]",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), 'github-app-private-key')]",
+      "properties": {
+        "value": "[parameters('githubAppPrivateKey')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[variables('jobIdentityName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.KeyVault/vaults/{0}', variables('kvName'))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), variables('roleKeyVaultSecretsUser'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleKeyVaultSecretsUser'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('workspaceName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "retentionInDays": 30,
+        "sku": {
+          "name": "PerGB2018"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2024-03-01",
+      "name": "[variables('managedEnvironmentName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName')), '2023-09-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName')), '2023-09-01').primarySharedKey]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/jobs",
+      "apiVersion": "2024-03-01",
+      "name": "[variables('dailyJobName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": "[variables('jobIdentityMap')]"
+      },
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', variables('managedEnvironmentName'))]",
+        "configuration": "[union(createObject('triggerType', parameters('jobTriggerType'), 'replicaTimeout', parameters('jobReplicaTimeout'), 'replicaRetryLimit', parameters('jobReplicaRetryLimit'), 'secrets', if(variables('hasGitHubAppConfig'), concat(createArray(createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-reasoning-endpoint', 'keyVaultUrl', format('{0}secrets/foundry-reasoning-endpoint', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-image-endpoint', 'keyVaultUrl', format('{0}secrets/foundry-image-endpoint', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-endpoint', 'keyVaultUrl', format('{0}secrets/foundry-endpoint', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-reasoning-deployment', 'keyVaultUrl', format('{0}secrets/foundry-reasoning-deployment-name', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-reasoning-api-version', 'keyVaultUrl', format('{0}secrets/foundry-reasoning-api-version', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-image-deployment', 'keyVaultUrl', format('{0}secrets/foundry-image-deployment-name', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-deployment', 'keyVaultUrl', format('{0}secrets/foundry-deployment-name', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri))), createArray(createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'github-app-id', 'keyVaultUrl', format('{0}secrets/github-app-id', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'github-app-installation-id', 'keyVaultUrl', format('{0}secrets/github-app-installation-id', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'github-app-private-key', 'keyVaultUrl', format('{0}secrets/github-app-private-key', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)))), createArray(createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-reasoning-endpoint', 'keyVaultUrl', format('{0}secrets/foundry-reasoning-endpoint', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-image-endpoint', 'keyVaultUrl', format('{0}secrets/foundry-image-endpoint', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-endpoint', 'keyVaultUrl', format('{0}secrets/foundry-endpoint', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-reasoning-deployment', 'keyVaultUrl', format('{0}secrets/foundry-reasoning-deployment-name', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-reasoning-api-version', 'keyVaultUrl', format('{0}secrets/foundry-reasoning-api-version', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-image-deployment', 'keyVaultUrl', format('{0}secrets/foundry-image-deployment-name', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)), createObject('identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), 'name', 'foundry-deployment', 'keyVaultUrl', format('{0}secrets/foundry-deployment-name', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri)))), 'registries', if(empty(parameters('containerRegistryServer')), createArray(), createArray(createObject('server', parameters('containerRegistryServer'), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')))))), if(equals(parameters('jobTriggerType'), 'Schedule'), createObject('scheduleTriggerConfig', createObject('cronExpression', parameters('jobScheduleCron'), 'parallelism', 1, 'replicaCompletionCount', 1)), createObject()))]",
+        "template": {
+          "containers": [
+            {
+              "name": "runner",
+              "image": "[parameters('jobImage')]",
+              "command": [
+                "node",
+                "scripts/hosted-bootstrap.mjs"
+              ],
+              "env": "[if(empty(parameters('hostedRunDateOverride')), concat(createArray(createObject('name', 'HOSTED_JOB_NAME', 'value', variables('dailyJobName')), createObject('name', 'AZURE_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').clientId), createObject('name', 'KEY_VAULT_URL', 'value', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri), createObject('name', 'FOUNDRY_REASONING_ENDPOINT', 'secretRef', 'foundry-reasoning-endpoint'), createObject('name', 'FOUNDRY_IMAGE_ENDPOINT', 'secretRef', 'foundry-image-endpoint'), createObject('name', 'FOUNDRY_ENDPOINT', 'secretRef', 'foundry-endpoint'), createObject('name', 'FOUNDRY_REASONING_DEPLOYMENT', 'secretRef', 'foundry-reasoning-deployment'), createObject('name', 'FOUNDRY_REASONING_API_VERSION', 'secretRef', 'foundry-reasoning-api-version'), createObject('name', 'FOUNDRY_IMAGE_DEPLOYMENT', 'secretRef', 'foundry-image-deployment'), createObject('name', 'FOUNDRY_DEPLOYMENT', 'secretRef', 'foundry-deployment'), createObject('name', 'GITHUB_OWNER', 'value', parameters('githubOwner')), createObject('name', 'GITHUB_REPO', 'value', parameters('githubRepo')), createObject('name', 'GITHUB_BRANCH', 'value', parameters('githubBranch')), createObject('name', 'GIT_AUTHOR_NAME', 'value', parameters('gitAuthorName')), createObject('name', 'GIT_AUTHOR_EMAIL', 'value', parameters('gitAuthorEmail')), createObject('name', 'HOSTED_RUNNER_COMMAND', 'value', parameters('hostedRunnerCommand')), createObject('name', 'PYTHONUNBUFFERED', 'value', '1'), createObject('name', 'HOSTED_PUSH_CHANGES', 'value', if(parameters('hostedPushChanges'), 'true', 'false'))), if(variables('hasGitHubAppConfig'), createArray(createObject('name', 'GITHUB_APP_ID', 'secretRef', 'github-app-id'), createObject('name', 'GITHUB_APP_INSTALLATION_ID', 'secretRef', 'github-app-installation-id'), createObject('name', 'GITHUB_APP_PRIVATE_KEY', 'secretRef', 'github-app-private-key')), createArray())), concat(concat(createArray(createObject('name', 'HOSTED_JOB_NAME', 'value', variables('dailyJobName')), createObject('name', 'AZURE_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').clientId), createObject('name', 'KEY_VAULT_URL', 'value', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri), createObject('name', 'FOUNDRY_REASONING_ENDPOINT', 'secretRef', 'foundry-reasoning-endpoint'), createObject('name', 'FOUNDRY_IMAGE_ENDPOINT', 'secretRef', 'foundry-image-endpoint'), createObject('name', 'FOUNDRY_ENDPOINT', 'secretRef', 'foundry-endpoint'), createObject('name', 'FOUNDRY_REASONING_DEPLOYMENT', 'secretRef', 'foundry-reasoning-deployment'), createObject('name', 'FOUNDRY_REASONING_API_VERSION', 'secretRef', 'foundry-reasoning-api-version'), createObject('name', 'FOUNDRY_IMAGE_DEPLOYMENT', 'secretRef', 'foundry-image-deployment'), createObject('name', 'FOUNDRY_DEPLOYMENT', 'secretRef', 'foundry-deployment'), createObject('name', 'GITHUB_OWNER', 'value', parameters('githubOwner')), createObject('name', 'GITHUB_REPO', 'value', parameters('githubRepo')), createObject('name', 'GITHUB_BRANCH', 'value', parameters('githubBranch')), createObject('name', 'GIT_AUTHOR_NAME', 'value', parameters('gitAuthorName')), createObject('name', 'GIT_AUTHOR_EMAIL', 'value', parameters('gitAuthorEmail')), createObject('name', 'HOSTED_RUNNER_COMMAND', 'value', parameters('hostedRunnerCommand')), createObject('name', 'PYTHONUNBUFFERED', 'value', '1'), createObject('name', 'HOSTED_PUSH_CHANGES', 'value', if(parameters('hostedPushChanges'), 'true', 'false'))), if(variables('hasGitHubAppConfig'), createArray(createObject('name', 'GITHUB_APP_ID', 'secretRef', 'github-app-id'), createObject('name', 'GITHUB_APP_INSTALLATION_ID', 'secretRef', 'github-app-installation-id'), createObject('name', 'GITHUB_APP_PRIVATE_KEY', 'secretRef', 'github-app-private-key')), createArray())), createArray(createObject('name', 'RUN_DATE_UTC', 'value', parameters('hostedRunDateOverride')))))]",
+              "resources": {
+                "cpu": "[json(parameters('jobCpu'))]",
+                "memory": "[parameters('jobMemory')]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]",
+        "[resourceId('Microsoft.App/managedEnvironments', variables('managedEnvironmentName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "foundryRoleAssignment",
+      "subscriptionId": "[split(parameters('foundryResourceId'), '/')[2]]",
+      "resourceGroup": "[split(parameters('foundryResourceId'), '/')[4]]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "foundryResourceName": {
+            "value": "[last(split(parameters('foundryResourceId'), '/'))]"
+          },
+          "principalId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[variables('roleCognitiveServicesUser')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "10758439448846168973"
+            }
+          },
+          "parameters": {
+            "foundryResourceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the existing Foundry / Azure AI Services account."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Object ID of the principal (managed identity) to grant access to."
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Built-in role definition GUID."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('foundryResourceName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryResourceName')), parameters('principalId'), parameters('roleDefinitionId'))]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName'))]"
+      ]
+    },
+    {
+      "condition": "[not(empty(parameters('containerRegistryResourceId')))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "containerRegistryRoleAssignment",
+      "subscriptionId": "[split(parameters('containerRegistryResourceId'), '/')[2]]",
+      "resourceGroup": "[split(parameters('containerRegistryResourceId'), '/')[4]]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "registryName": {
+            "value": "[last(split(parameters('containerRegistryResourceId'), '/'))]"
+          },
+          "principalId": {
+            "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[variables('roleAcrPull')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "7194835143376646932"
+            }
+          },
+          "parameters": {
+            "registryName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the existing Azure Container Registry."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Object ID of the principal (managed identity) to grant access to."
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Built-in role definition GUID."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', parameters('registryName'))]",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('registryName')), parameters('principalId'), parameters('roleDefinitionId'))]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "swaHostname": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/staticSites', variables('swaName')), '2024-04-01').defaultHostname]"
+    },
+    "keyVaultName": {
+      "type": "string",
+      "value": "[variables('kvName')]"
+    },
+    "keyVaultUri": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri]"
+    },
+    "logAnalyticsWorkspaceName": {
+      "type": "string",
+      "value": "[variables('workspaceName')]"
+    },
+    "logAnalyticsWorkspaceCustomerId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName')), '2023-09-01').customerId]"
+    },
+    "containerAppsEnvironmentId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.App/managedEnvironments', variables('managedEnvironmentName'))]"
+    },
+    "hostedJobName": {
+      "type": "string",
+      "value": "[variables('dailyJobName')]"
+    },
+    "hostedJobTriggerType": {
+      "type": "string",
+      "value": "[parameters('jobTriggerType')]"
+    },
+    "jobIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').principalId]"
+    },
+    "jobIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').clientId]"
+    },
+    "hostedRunDateOverrideApplied": {
+      "type": "string",
+      "value": "[parameters('hostedRunDateOverride')]"
+    },
+    "githubAppConfigApplied": {
+      "type": "bool",
+      "value": "[variables('hasGitHubAppConfig')]"
+    }
+  }
+}

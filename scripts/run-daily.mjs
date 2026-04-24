@@ -1,19 +1,21 @@
-// Thin orchestrator. The actual daily work is performed by the Squad agents
-// (see .squad/*.md) — this script exists so a Clawpilot automation has a single
-// entry point to invoke. In practice the automation will run:
-//
-//   copilot --agent squad --yolo
-//
-// and Squad will read the .md files and drive the day. This script is here for
-// (a) sanity-checking the repo state before/after, and (b) future use if we want
-// to bypass copilot CLI for headless runs.
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
-import { execSync } from "node:child_process";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, "..");
+const pythonCommand = process.platform === "win32" ? "python" : "python3";
 
-console.log("== Pre-run gallery check ==");
-execSync("node scripts/rebuild-routes.mjs", { stdio: "inherit" });
+const result = spawnSync(
+  pythonCommand,
+  ["-m", "orchestrator.main", "--repo-root", REPO_ROOT, ...process.argv.slice(2)],
+  {
+    cwd: REPO_ROOT,
+    stdio: "inherit",
+    env: process.env,
+  }
+);
 
-console.log("\n== Hand off to Squad ==");
-console.log("Run the following to perform today's session:");
-console.log("  copilot --agent squad --yolo");
-console.log("\n(After completion, this script will validate and commit.)");
+if (result.status !== 0) {
+  process.exit(result.status ?? 1);
+}

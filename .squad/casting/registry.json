@@ -1,25 +1,62 @@
 {
-  "agents": {
-    "artist": {
-      "persistent_name": "Artist",
-      "universe": null,
-      "created_at": "2026-04-23T00:00:00Z",
-      "legacy_named": true,
+  "version": 1,
+  "current_universe": "south-park",
+  "members": [
+    {
+      "persistent_name": "Stan",
+      "role": "Lead",
+      "universe": "south-park",
+      "created_at": "2026-04-24T12:57:10Z",
+      "legacy_named": false,
       "status": "active"
     },
-    "critic": {
-      "persistent_name": "Critic",
-      "universe": null,
-      "created_at": "2026-04-23T00:00:00Z",
-      "legacy_named": true,
+    {
+      "persistent_name": "Wendy",
+      "role": "Frontend Dev",
+      "universe": "south-park",
+      "created_at": "2026-04-24T12:57:10Z",
+      "legacy_named": false,
       "status": "active"
     },
-    "curator": {
-      "persistent_name": "Curator",
-      "universe": null,
-      "created_at": "2026-04-23T00:00:00Z",
-      "legacy_named": true,
+    {
+      "persistent_name": "Kyle",
+      "role": "Backend Dev",
+      "universe": "south-park",
+      "created_at": "2026-04-24T12:57:10Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Tolkien",
+      "role": "Platform Dev",
+      "universe": "south-park",
+      "created_at": "2026-04-24T12:57:10Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Butters",
+      "role": "Tester",
+      "universe": "south-park",
+      "created_at": "2026-04-24T12:57:10Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Scribe",
+      "role": "Session Logger",
+      "universe": "fixed",
+      "created_at": "2026-04-24T12:57:10Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Ralph",
+      "role": "Work Monitor",
+      "universe": "fixed",
+      "created_at": "2026-04-24T12:57:10Z",
+      "legacy_named": false,
       "status": "active"
     }
-  }
+  ]
 }

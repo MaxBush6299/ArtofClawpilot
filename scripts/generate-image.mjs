@@ -33,19 +33,15 @@ function slugify(s) {
 }
 
 async function callFoundryImage({ endpoint, deployment, prompt, credential }) {
-  // PLACEHOLDER: Foundry image-generation REST surface for MAI-Image-2e.
-  // Replace the URL/payload shape once the exact API is confirmed for your project.
-  // Auth pattern: bearer token from the AI Services scope.
   const token = await credential.getToken("https://cognitiveservices.azure.com/.default");
   if (!token) throw new Error("Failed to acquire Azure AD token for Foundry.");
 
-  const url = `${endpoint.replace(/\/$/, "")}/images/generations?api-version=2024-10-21`;
+  const url = `${endpoint.replace(/\/$/, "")}/mai/v1/images/generations`;
   const body = {
     model: deployment,
     prompt,
-    n: 1,
-    size: "1024x1024",
-    response_format: "b64_json",
+    width: 1024,
+    height: 1024,
   };
 
   const res = await fetch(url, {
@@ -61,6 +57,9 @@ async function callFoundryImage({ endpoint, deployment, prompt, credential }) {
     throw new Error(`Foundry call failed: ${res.status} ${res.statusText}\n${text}`);
   }
   const json = await res.json();
+  if (json?.content_filter_result) {
+    throw new Error("Foundry call was content filtered.");
+  }
   const b64 = json?.data?.[0]?.b64_json;
   if (!b64) throw new Error("No image data in Foundry response.");
   return Buffer.from(b64, "base64");
