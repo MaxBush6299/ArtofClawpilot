@@ -312,8 +312,9 @@ class FoundryImageClient:
         self._token_provider = token_provider
 
     def generate_image(self, prompt_package: ArtistPromptPackage) -> ImageGenerationResult:
-        api_version = self._config.api_version or "preview"
-        url = f"{self._config.endpoint.rstrip('/')}/mai/v1/images/generations?api-version={api_version}"
+        url = f"{self._config.endpoint.rstrip('/')}/mai/v1/images/generations"
+        if self._config.api_version:
+            url = f"{url}?api-version={self._config.api_version}"
         prompt = (prompt_package.reviewed_prompt or "").strip()
         if prompt_package.review_status != "final-reviewed" or not prompt:
             raise FoundryTransportError(
