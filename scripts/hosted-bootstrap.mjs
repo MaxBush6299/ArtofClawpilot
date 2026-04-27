@@ -11,7 +11,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 const DEFAULT_HOSTED_RUNNER_COMMAND =
-  'python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE" --run-date "$RUN_DATE_UTC"';
+  'python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE" --run-date "$RUN_DATE_UTC" --run-id "$RUN_ID"';
 const LOG_COMPONENT = "hosted-bootstrap";
 const LOG_RUNTIME_CONTEXT = {
   component: LOG_COMPONENT,
@@ -45,14 +45,16 @@ Optional environment variables
   GIT_AUTHOR_NAME          default: Art of Clawpilot Bot
   GIT_AUTHOR_EMAIL         default: artofclawpilot-bot@users.noreply.github.com
   HOSTED_WORKDIR           default: workspace
-  HOSTED_RUNNER_COMMAND    default: python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE" --run-date "$RUN_DATE_UTC"
+  HOSTED_RUNNER_COMMAND    default: python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE" --run-date "$RUN_DATE_UTC" --run-id "$RUN_ID"
   HOSTED_PUSH_CHANGES      default: false
   HOSTED_COMMIT_MESSAGE    default: chore: hosted runner update for <UTC date>
   RUN_DATE_UTC             default: current UTC date; pin this for smoke/idempotency replay
+  RUN_ID                   default: scheduled-{RUN_DATE_UTC}; use for manual or concurrent runs
 
 Injected at runtime
   REPO_WORKSPACE           fresh clone path used by the hosted command
   RUN_DATE_UTC             UTC date for this hosted run
+  RUN_ID                   unique run identifier for idempotency
   HOSTED_TRACE_ID          shared correlation id forwarded into the Python runner
 
 Usage
@@ -241,9 +243,11 @@ async function main() {
   }
 
   const runDate = process.env.RUN_DATE_UTC?.trim() || new Date().toISOString().slice(0, 10);
-  const traceId = process.env.HOSTED_TRACE_ID?.trim() || `hosted-${runDate}`;
+  const runId = process.env.RUN_ID?.trim() || `scheduled-${runDate}`;
+  const traceId = process.env.HOSTED_TRACE_ID?.trim() || `hosted-${runId}`;
   setLogContext({
     runDate,
+    runId,
     traceId,
   });
   const {
@@ -361,6 +365,7 @@ async function main() {
         ...process.env,
         REPO_WORKSPACE: clonePath,
         RUN_DATE_UTC: runDate,
+        RUN_ID: runId,
         HOSTED_TRACE_ID: traceId,
       },
       shell: true,

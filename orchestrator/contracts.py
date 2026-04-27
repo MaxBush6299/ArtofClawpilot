@@ -64,6 +64,7 @@ class RuntimeConfig:
     repo_name: str
     branch: str
     run_date: str
+    run_id: str
     reasoning_model: ReasoningModelConfig
     image_model: ImageModelConfig
 
@@ -78,6 +79,7 @@ class GalleryImageRecord:
     prompt_summary: str | None = None
     criticism: str | None = None
     run_date: str | None = None
+    run_id: str | None = None
     model: str | None = None
     reasoning_model: str | None = None
     slug: str | None = None
@@ -94,6 +96,7 @@ class GalleryImageRecord:
             prompt_summary=raw.get("promptSummary"),
             criticism=raw.get("criticism"),
             run_date=raw.get("runDate"),
+            run_id=raw.get("runId"),
             model=raw.get("model"),
             reasoning_model=raw.get("reasoningModel"),
             slug=raw.get("slug"),
@@ -102,6 +105,9 @@ class GalleryImageRecord:
 
     def effective_run_date(self) -> str:
         return self.run_date or self.created_at[:10]
+    
+    def effective_run_id(self) -> str:
+        return self.run_id or self.id
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -120,6 +126,8 @@ class GalleryImageRecord:
             payload["promptSummary"] = self.prompt_summary
         if self.run_date is not None:
             payload["runDate"] = self.run_date
+        if self.run_id is not None:
+            payload["runId"] = self.run_id
         if self.model is not None:
             payload["model"] = self.model
         if self.reasoning_model is not None:
@@ -180,6 +188,7 @@ class SkipError:
 class SkipRecord:
     id: str
     run_date: str
+    run_id: str
     stage: str
     reason_code: str
     message: str
@@ -190,9 +199,13 @@ class SkipRecord:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "SkipRecord":
+        run_id = raw.get("runId")
+        if run_id is None:
+            run_id = raw["id"]
         return cls(
             id=raw["id"],
             run_date=raw["runDate"],
+            run_id=run_id,
             stage=raw["stage"],
             reason_code=raw["reasonCode"],
             message=raw["message"],
@@ -206,6 +219,7 @@ class SkipRecord:
         payload = {
             "id": self.id,
             "runDate": self.run_date,
+            "runId": self.run_id,
             "stage": self.stage,
             "reasonCode": self.reason_code,
             "message": self.message,
@@ -327,6 +341,7 @@ class NextBrief:
 @dataclass(slots=True)
 class RunContext:
     run_date: str
+    run_id: str
     started_at: str
     repo_root: str
     trace_id: str
@@ -361,13 +376,15 @@ class RoleFailure:
     def to_skip_record(
         self,
         run_date: str,
+        run_id: str,
         created_at: str,
         *,
         creative_context: dict[str, Any] | None = None,
     ) -> SkipRecord:
         return SkipRecord(
-            id=f"skip-{run_date}",
+            id=f"skip-{run_id}",
             run_date=run_date,
+            run_id=run_id,
             stage=self.stage.value,
             reason_code=self.reason_code.value,
             message=self.message,

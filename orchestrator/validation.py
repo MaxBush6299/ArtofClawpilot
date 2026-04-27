@@ -89,7 +89,7 @@ def validate_gallery_state(state: GalleryState) -> None:
     _require(state.version == 1, "pre_run", "gallery_version_invalid", "gallery.json version must be 1", version=state.version)
     seen_room_ids: set[str] = set()
     seen_image_ids: set[str] = set()
-    seen_run_dates: set[str] = set()
+    seen_run_ids: set[str] = set()
     for room in state.rooms:
         _require(ROOM_ID_RE.match(room.id) is not None, "pre_run", "room_id_invalid", "room id must look like room-01", room_id=room.id)
         _require(room.id not in seen_room_ids, "pre_run", "room_id_duplicate", "duplicate room id", room_id=room.id)
@@ -99,15 +99,15 @@ def validate_gallery_state(state: GalleryState) -> None:
             validate_existing_image_record(image)
             _require(image.id not in seen_image_ids, "pre_run", "image_id_duplicate", "duplicate image id", image_id=image.id)
             seen_image_ids.add(image.id)
-            run_date = image.effective_run_date()
-            _require(run_date not in seen_run_dates, "pre_run", "run_date_duplicate", "multiple published images share the same runDate", run_date=run_date)
-            seen_run_dates.add(run_date)
-    seen_skip_dates: set[str] = set()
+            run_id = image.effective_run_id()
+            _require(run_id not in seen_run_ids, "pre_run", "run_id_duplicate", "multiple published images share the same runId", run_id=run_id)
+            seen_run_ids.add(run_id)
+    seen_skip_ids: set[str] = set()
     for skip in state.skipped:
         validate_skip_record(skip, category="pre_run", require_error=False)
-        _require(skip.run_date not in seen_skip_dates, "pre_run", "skip_run_date_duplicate", "duplicate skip runDate", run_date=skip.run_date)
-        _require(skip.run_date not in seen_run_dates, "pre_run", "run_date_conflict", "runDate cannot appear in both image and skip ledgers", run_date=skip.run_date)
-        seen_skip_dates.add(skip.run_date)
+        _require(skip.run_id not in seen_skip_ids, "pre_run", "skip_run_id_duplicate", "duplicate skip runId", run_id=skip.run_id)
+        _require(skip.run_id not in seen_run_ids, "pre_run", "run_id_conflict", "runId cannot appear in both image and skip ledgers", run_id=skip.run_id)
+        seen_skip_ids.add(skip.run_id)
 
 
 def validate_existing_image_record(image: GalleryImageRecord) -> None:
@@ -138,14 +138,14 @@ def validate_next_brief(brief: NextBrief) -> None:
     _require(bool(brief.notes.strip()), "pre_run", "brief_notes_missing", "next-brief notes are required")
 
 
-def resolve_existing_outcome(state: GalleryState, run_date: str) -> str | None:
+def resolve_existing_outcome(state: GalleryState, run_date: str, run_id: str) -> str | None:
+    for skip in state.skipped:
+        if skip.run_id == run_id:
+            return "skip"
     for room in state.rooms:
         for image in room.images:
-            if image.effective_run_date() == run_date:
+            if image.effective_run_id() == run_id:
                 return "publish"
-    for skip in state.skipped:
-        if skip.run_date == run_date:
-            return "skip"
     return None
 
 
@@ -160,16 +160,15 @@ def validate_pre_run_state(
     validate_gallery_state(gallery)
     validate_critiques_state(critiques)
     validate_next_brief(next_brief)
-    return PreRunValidationResult(existing_outcome=resolve_existing_outcome(gallery, config.run_date))
+    return PreRunValidationResult(existing_outcome=resolve_existing_outcome(gallery, config.run_date, config.run_id))
 
 
-def ensure_run_date_available(state: GalleryState, run_date: str) -> None:
-    _require(RUN_DATE_RE.match(run_date) is not None, "pre_run", "run_date_invalid", "run_date must be YYYY-MM-DD", run_date=run_date)
+def ensure_run_id_available(state: GalleryState, run_id: str) -> None:
     for room in state.rooms:
         for image in room.images:
-            _require(image.effective_run_date() != run_date, "pre_run", "run_date_already_published", "runDate already has a published image", run_date=run_date)
+            _require(image.effective_run_id() != run_id, "pre_run", "run_id_already_published", "runId already has a published image", run_id=run_id)
     for skip in state.skipped:
-        _require(skip.run_date != run_date, "pre_run", "run_date_already_skipped", "runDate already has a skip record", run_date=run_date)
+        _require(skip.run_id != run_id, "pre_run", "run_id_already_skipped", "runId already has a skip record", run_id=run_id)
 
 
 def validate_curator_plan(plan: CuratorPlan) -> None:

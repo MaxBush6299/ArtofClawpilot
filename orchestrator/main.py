@@ -102,8 +102,12 @@ def parse_args() -> RuntimeArgs:
         if not (repo_workspace := os.environ.get("REPO_WORKSPACE"))
         else repo_workspace
     )
+    run_date_default = os.environ.get("RUN_DATE_UTC") or datetime.now(UTC).date().isoformat()
+    run_id_default = os.environ.get("RUN_ID") or f"scheduled-{run_date_default}"
+    
     parser.add_argument("--repo-root", default=str(default_repo_root))
-    parser.add_argument("--run-date", default=os.environ.get("RUN_DATE_UTC") or datetime.now(UTC).date().isoformat())
+    parser.add_argument("--run-date", default=run_date_default)
+    parser.add_argument("--run-id", default=run_id_default, help="Unique run identity for idempotency (e.g., scheduled-2026-04-27 or manual-2026-04-27-abc123)")
     parser.add_argument("--repo-owner", default=os.environ.get("GITHUB_OWNER") or "MaxBush6299")
     parser.add_argument("--repo-name", default=os.environ.get("GITHUB_REPO") or "ArtofClawpilot")
     parser.add_argument("--branch", default=os.environ.get("GITHUB_BRANCH") or "main")
@@ -173,6 +177,7 @@ def parse_args() -> RuntimeArgs:
         repo_name=parsed.repo_name,
         branch=parsed.branch,
         run_date=parsed.run_date,
+        run_id=parsed.run_id,
         reasoning_model=parsed_reasoning_model(parsed),
         image_model=parsed_image_model(parsed),
     )
@@ -227,6 +232,7 @@ for env_name, field_name in (
 
 def set_log_context(context: RunContext) -> None:
     LOG_RUNTIME_CONTEXT["runDate"] = context.run_date
+    LOG_RUNTIME_CONTEXT["runId"] = context.run_id
     LOG_RUNTIME_CONTEXT["traceId"] = context.trace_id
 
 
@@ -374,6 +380,7 @@ def build_publish_outcome(
         prompt_summary=artist_result.prompt_package.prompt_summary,
         criticism=critic_review.pull_quote if critic_review else None,
         run_date=context.run_date,
+        run_id=context.run_id,
         model=image_result.deployment,
         reasoning_model=config.reasoning_model.deployment,
         slug=slug,
@@ -825,6 +832,7 @@ def build_skip_outcome(
         run_date=context.run_date,
         skip_record=failure.to_skip_record(
             context.run_date,
+            context.run_id,
             context.started_at,
             creative_context=creative_context,
         ),
@@ -1031,15 +1039,16 @@ def main() -> int:
     evidence = RunEvidence()
     context = RunContext(
         run_date=args.config.run_date,
+        run_id=args.config.run_id,
         started_at=datetime.now(UTC).isoformat(),
         repo_root=str(args.repo_root),
-        trace_id=os.environ.get("HOSTED_TRACE_ID") or f"hosted-{args.config.run_date}",
+        trace_id=os.environ.get("HOSTED_TRACE_ID") or f"local-{args.config.run_id}",
     )
     set_log_context(context)
     try:
         phase_log(
             "config",
-            f"resolving run for {context.run_date}",
+            f"resolving run for {context.run_date} with runId {context.run_id}",
             event="run_started",
             repoOwner=args.config.repo_owner,
             repoName=args.config.repo_name,
@@ -1081,7 +1090,7 @@ def main() -> int:
         if pre_run.existing_outcome is not None:
             phase_log(
                 "pre_run",
-                f"runDate {context.run_date} already resolved as {pre_run.existing_outcome}; exiting cleanly",
+                f"runId {context.run_id} already resolved as {pre_run.existing_outcome}; exiting cleanly",
                 event="already_resolved",
                 outcome=pre_run.existing_outcome,
             )
