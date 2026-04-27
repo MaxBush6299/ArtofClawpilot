@@ -14,3 +14,12 @@
 - Butters' closure gate for issue #6 required one durable publish-or-skip outcome per `runDate`, idempotent rerun no-op behavior, phase-tagged failures, write-set safety, explicit final call-count observability, and proof that only the reviewed prompt package reaches `MAI-Image-2e`.
 - The first execution wave was the hosted foundation slice (#3, #4, #5, #12); README cutover remained a follow-through item, not a blocker to foundation execution.
 - Current handoff status: the hosted runner foundation is in place; issues #2, #3, #4, #5, #6, #7, and #12 are closed; issues #8, #9, #10, #11, #13, #14, and #15 remain open. Exact orchestration detail for the final #6 closeout was not present in the squad logs reviewed by Scribe.
+
+## 2026-04-27
+
+- First Azure Container Apps Job invocation succeeded through MAI image generation but failed at `git push` with `Permission to MaxBush6299/ArtofClawpilot.git denied ... exitCode 128`. Root cause: GitHub App installation lacks Contents: Read & Write permission. Clone succeeded (proving Contents: Read exists); push failed (proving Contents: Write missing).
+- Team consensus on recovery: Fix GitHub App permissions by granting Contents: Read & Write, then rerun smoke proof on disposable `hosted-smoke` branch per documented safety stance (docs/architecture/hosted-smoke-checklist.md). Do not rerun against main until smoke proof passes on branch.
+- Hosted smoke architecture requires three phases on disposable `hosted-smoke` branch: Phase A (auth/wiring dry-run), Phase B (durable publish + idempotent rerun), Phase C (failure-path proof). No smoke commits land on main during proof. Butters reviews ACA logs + smoke branch commits before sign-off.
+- Architecture decision reaffirmed: direct push to `main` is the correct design (not PR-based). Single-transaction publish contract (one commit per `runDate`) preserves design intent and one-commit-per-day invariant. PR-based fallback deferred unless branch protection explicitly blocks app.
+- Documentation gap: Add GitHub App permission prerequisites to docs/architecture/hosted-daily-run.md as setup requirement section, explicitly listing Contents: Read & Write as required for git push to main and Metadata: Read-only as automatically included.
+- Smoke proof checkpoint: After Phase B proof passes on hosted-smoke branch with idempotent rerun validation, production cutover resumes with intended direct-push-to-main design. Permissions fix and branch policy form the immediate safe next step.
