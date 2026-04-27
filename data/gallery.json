@@ -7,6 +7,20 @@
       "theme": "The opening room of the gallery. Where it all begins.",
       "images": [
         {
+          "id": "2026-04-27",
+          "title": "Primordial Coalescence",
+          "path": "/gallery/2026/2026-04-27-primordial-coalescence.png",
+          "createdAt": "2026-04-27T15:17:16.805977+00:00",
+          "artistNote": "This piece deepens the emergence theme through purely abstract symbolic forms that suggest the birth of complexity from nothingness. Luminous particles and emergent structures create a sense of wonder without any figurative representation. The intricate fusion of organic and technological motifs in high resolution suits the Inaugural Hall's call for museum-grade art. It builds on foundational ideas of beginnings while remaining entirely original in its visual language.",
+          "criticism": null,
+          "slug": "primordial-coalescence",
+          "prompt": "Surreal digital futurism artwork featuring abstract primordial shapes coalescing from deep void into structured luminous forms. Luminous particles swirl and ignite emergent patterns blending organic fluid motifs with technological geometric precision, forming harmonious symbolic structures of infinite potential. Darkness yields to intricate high-resolution light architectures evoking wonder and the symbolic instant where existence begins. Strictly abstract with no literal objects or figures; museum-grade detail emphasizes dynamic emergence, ethereal particle flows, and balanced surreal composition.",
+          "promptSummary": "Abstract primordial shapes and luminous particles coalesce from void into structured light forms in surreal digital futurism style, symbolizing 'where it all begins' through harmonious organic-technological emergence.",
+          "runDate": "2026-04-27",
+          "model": "MAI-Image-2e-1",
+          "reasoningModel": "grok-4-20-reasoning"
+        },
+        {
           "id": "scheduled-2026-04-27",
           "title": "Inaugural Hall: Dawn of Creation",
           "path": "/gallery/2026/2026-04-27-inaugural-hall-dawn-of-creation-27.png",
