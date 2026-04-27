@@ -35,6 +35,45 @@
           "role": "Work Monitor"
         }
       ]
+    },
+    {
+      "assignment_id": "20260427-add-cartman-solution-engineer",
+      "created_at": "2026-04-27T18:27:53Z",
+      "universe": "south-park",
+      "members": [
+        {
+          "name": "Stan",
+          "role": "Lead"
+        },
+        {
+          "name": "Wendy",
+          "role": "Frontend Dev"
+        },
+        {
+          "name": "Kyle",
+          "role": "Backend Dev"
+        },
+        {
+          "name": "Tolkien",
+          "role": "Platform Dev"
+        },
+        {
+          "name": "Butters",
+          "role": "Tester"
+        },
+        {
+          "name": "Cartman",
+          "role": "Solution Engineer Consultant"
+        },
+        {
+          "name": "Scribe",
+          "role": "Session Logger"
+        },
+        {
+          "name": "Ralph",
+          "role": "Work Monitor"
+        }
+      ]
     }
   ]
 }

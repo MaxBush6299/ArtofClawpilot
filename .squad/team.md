@@ -23,5 +23,6 @@
 | Kyle | Backend Dev | Python jobs, orchestration, Foundry/image pipeline | 🔧 |
 | Tolkien | Platform Dev | Azure Container Apps Jobs, Key Vault, SWA, deployment wiring | ⚙️ |
 | Butters | Tester | Quality, regression coverage, execution contracts | 🧪 |
+| Cartman | Solution Engineer Consultant | Microsoft/Azure-grounded solution guidance, demos, learning docs | 📝 |
 | Scribe | Session Logger | Decisions, logs, cross-agent context | 📋 |
 | Ralph | Work Monitor | Backlog, issue flow, follow-up work | 🔄 |
