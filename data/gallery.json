@@ -3,9 +3,25 @@
   "rooms": [
     {
       "id": "room-01",
-      "name": "Room I — Inaugural Hall",
+      "name": "Room I \u2014 Inaugural Hall",
       "theme": "The opening room of the gallery. Where it all begins.",
-      "images": []
+      "images": [
+        {
+          "id": "scheduled-2026-04-27",
+          "title": "Inaugural Hall: Dawn of Creation",
+          "path": "/gallery/2026/2026-04-27-inaugural-hall-dawn-of-creation-27.png",
+          "createdAt": "2026-04-27T16:38:02.635876+00:00",
+          "artistNote": "This piece establishes the beginning of the artistic journey in a grand inaugural hall filled with possibility. Warm morning light symbolizes the first spark of inspiration flooding the space. Subtle hints on walls and pedestals invite imagination without revealing specific works, maintaining the theme of potential. The museum-quality realism balances architectural grandeur with symbolic anticipation of what is yet to emerge.",
+          "criticism": null,
+          "slug": "inaugural-hall-dawn-of-creation",
+          "prompt": "Museum-grade realistic rendering of a vast inaugural hall as the grand opening room of an art gallery. Imposing architecture with high ceilings, classical columns and polished marble floors bathed in warm golden morning light flooding through tall windows. Empty pedestals and partially revealed wall spaces show only the subtlest hints of emerging artworks through faint outlines and draped coverings, evoking profound wonder, potential, anticipation and the spark of artistic creation. Highly detailed, symbolic depth, warm luminous atmosphere, no completed artworks visible.",
+          "promptSummary": "Vast museum inaugural hall with imposing architecture bathed in warm golden morning light from tall windows, featuring empty pedestals and subtle hints of future artworks to evoke wonder and creative potential.",
+          "runDate": "2026-04-27",
+          "runId": "scheduled-2026-04-27",
+          "model": "MAI-Image-2e-1",
+          "reasoningModel": "grok-4-20-reasoning"
+        }
+      ]
     }
   ],
   "skipped": []
