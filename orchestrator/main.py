@@ -59,6 +59,7 @@ DOMAIN_SKIP_CODES = {
     FailureCode.RESPONSE_SHAPE,
     FailureCode.VALIDATION,
 }
+GUIDING_DESCRIPTION_MAX_CHARS = 1000
 
 
 @dataclass(slots=True)
@@ -82,6 +83,11 @@ class RuntimeArgs:
     fixture_scenario: str
     git_author_name: str
     git_author_email: str
+    trigger_source: str
+    request_id: str | None
+    caller_identity: str | None
+    correlation_id: str | None
+    guiding_description: str | None
 
 
 @dataclass(slots=True)
@@ -103,11 +109,23 @@ def parse_args() -> RuntimeArgs:
         else repo_workspace
     )
     run_date_default = os.environ.get("RUN_DATE_UTC") or datetime.now(UTC).date().isoformat()
-    run_id_default = os.environ.get("RUN_ID") or f"scheduled-{run_date_default}"
     
     parser.add_argument("--repo-root", default=str(default_repo_root))
     parser.add_argument("--run-date", default=run_date_default)
-    parser.add_argument("--run-id", default=run_id_default, help="Unique run identity for idempotency (e.g., scheduled-2026-04-27 or manual-2026-04-27-abc123)")
+    parser.add_argument("--run-id", default=None, help="Unique run identity for idempotency (e.g., scheduled-2026-04-27 or manual-2026-04-27-abc123)")
+    parser.add_argument(
+        "--trigger-source",
+        default=os.environ.get("TRIGGER_SOURCE") or "scheduled",
+        help="Source that initiated this run, such as scheduled, manual-api, or manual-cli.",
+    )
+    parser.add_argument("--request-id", default=os.environ.get("REQUEST_ID") or None)
+    parser.add_argument("--caller-identity", default=os.environ.get("CALLER_IDENTITY") or None)
+    parser.add_argument("--correlation-id", default=os.environ.get("CORRELATION_ID") or None)
+    parser.add_argument(
+        "--guiding-description",
+        default=os.environ.get("GUIDING_DESCRIPTION") or None,
+        help="Optional advisory context for Curator. Max 1000 characters; not a prompt override.",
+    )
     parser.add_argument("--repo-owner", default=os.environ.get("GITHUB_OWNER") or "MaxBush6299")
     parser.add_argument("--repo-name", default=os.environ.get("GITHUB_REPO") or "ArtofClawpilot")
     parser.add_argument("--branch", default=os.environ.get("GITHUB_BRANCH") or "main")
@@ -172,6 +190,10 @@ def parse_args() -> RuntimeArgs:
         default=os.environ.get("GIT_AUTHOR_EMAIL") or "artofclawpilot-bot@users.noreply.github.com",
     )
     parsed = parser.parse_args()
+    parsed.run_id = parsed.run_id or os.environ.get("RUN_ID") or f"scheduled-{parsed.run_date}"
+    guiding_description = parsed.guiding_description.strip() if parsed.guiding_description else None
+    if guiding_description is not None and len(guiding_description) > GUIDING_DESCRIPTION_MAX_CHARS:
+        parser.error(f"--guiding-description must be {GUIDING_DESCRIPTION_MAX_CHARS} characters or fewer")
     config = RuntimeConfig(
         repo_owner=parsed.repo_owner,
         repo_name=parsed.repo_name,
@@ -180,6 +202,7 @@ def parse_args() -> RuntimeArgs:
         run_id=parsed.run_id,
         reasoning_model=parsed_reasoning_model(parsed),
         image_model=parsed_image_model(parsed),
+        trigger_source=parsed.trigger_source,
     )
     return RuntimeArgs(
         repo_root=Path(parsed.repo_root).resolve(),
@@ -190,6 +213,11 @@ def parse_args() -> RuntimeArgs:
         fixture_scenario=parsed.fixture_scenario,
         git_author_name=parsed.git_author_name,
         git_author_email=parsed.git_author_email,
+        trigger_source=parsed.trigger_source,
+        request_id=parsed.request_id,
+        caller_identity=parsed.caller_identity,
+        correlation_id=parsed.correlation_id,
+        guiding_description=guiding_description,
     )
 
 
@@ -234,6 +262,13 @@ def set_log_context(context: RunContext) -> None:
     LOG_RUNTIME_CONTEXT["runDate"] = context.run_date
     LOG_RUNTIME_CONTEXT["runId"] = context.run_id
     LOG_RUNTIME_CONTEXT["traceId"] = context.trace_id
+    LOG_RUNTIME_CONTEXT["triggerSource"] = context.trigger_source
+    if context.request_id:
+        LOG_RUNTIME_CONTEXT["requestId"] = context.request_id
+    if context.caller_identity:
+        LOG_RUNTIME_CONTEXT["callerIdentity"] = context.caller_identity
+    if context.correlation_id:
+        LOG_RUNTIME_CONTEXT["correlationId"] = context.correlation_id
 
 
 def emit_log(
@@ -386,6 +421,7 @@ def build_publish_outcome(
         reasoning_model=config.reasoning_model.deployment,
         slug=slug,
         prompt=artist_result.prompt_package.prompt,
+        trigger_source=context.trigger_source,
     )
     return PublishOutcome(
         run_date=context.run_date,
@@ -836,6 +872,7 @@ def build_skip_outcome(
             context.run_id,
             context.started_at,
             creative_context=creative_context,
+            trigger_source=context.trigger_source,
         ),
         critique=critique,
         next_brief=next_brief,
@@ -1044,6 +1081,11 @@ def main() -> int:
         started_at=datetime.now(UTC).isoformat(),
         repo_root=str(args.repo_root),
         trace_id=os.environ.get("HOSTED_TRACE_ID") or f"local-{args.config.run_id}",
+        trigger_source=args.trigger_source,
+        request_id=args.request_id,
+        caller_identity=args.caller_identity,
+        correlation_id=args.correlation_id,
+        guiding_description=args.guiding_description,
     )
     set_log_context(context)
     try:
@@ -1058,6 +1100,12 @@ def main() -> int:
             useFixtures=args.use_fixtures,
             reasoningDeployment=args.config.reasoning_model.deployment,
             imageDeployment=args.config.image_model.deployment,
+            triggerSource=args.trigger_source,
+            requestId=args.request_id,
+            callerIdentity=args.caller_identity,
+            correlationId=args.correlation_id,
+            hasGuidingDescription=bool(args.guiding_description),
+            guidingDescriptionChars=len(args.guiding_description or ""),
         )
         ensure_repo_state(args.repo_root, args.config.branch, allow_dirty=args.allow_dirty or args.dry_run)
         phase_log(

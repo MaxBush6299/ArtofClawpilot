@@ -1,0 +1,19 @@
+{
+  "name": "art-of-clawpilot-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "build": "npm run check",
+    "check": "node --check src/functions/internalGenerate.js && node --check src/lib/auth.js && node --check src/lib/config.js && node --check src/lib/gallery.js && node --check src/lib/jobs.js && node --check src/lib/validation.js && node --check test/validation.test.js && node --check test/gallery.test.js && node --check test/auth.test.js",
+    "test": "node test/validation.test.js && node test/gallery.test.js && node test/auth.test.js",
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/arm-appcontainers": "^3.0.0",
+    "@azure/functions": "^4.7.3",
+    "@azure/identity": "^4.4.0",
+    "@azure/keyvault-secrets": "^4.8.0"
+  }
+}

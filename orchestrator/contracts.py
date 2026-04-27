@@ -67,6 +67,7 @@ class RuntimeConfig:
     run_id: str
     reasoning_model: ReasoningModelConfig
     image_model: ImageModelConfig
+    trigger_source: str = "scheduled"
 
 
 @dataclass(slots=True)
@@ -84,6 +85,7 @@ class GalleryImageRecord:
     reasoning_model: str | None = None
     slug: str | None = None
     prompt: str | None = None
+    trigger_source: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "GalleryImageRecord":
@@ -101,6 +103,7 @@ class GalleryImageRecord:
             reasoning_model=raw.get("reasoningModel"),
             slug=raw.get("slug"),
             prompt=raw.get("prompt"),
+            trigger_source=raw.get("triggerSource"),
         )
 
     def effective_run_date(self) -> str:
@@ -122,6 +125,8 @@ class GalleryImageRecord:
             payload["slug"] = self.slug
         if self.prompt is not None:
             payload["prompt"] = self.prompt
+        if self.trigger_source is not None:
+            payload["triggerSource"] = self.trigger_source
         if self.prompt_summary is not None:
             payload["promptSummary"] = self.prompt_summary
         if self.run_date is not None:
@@ -196,6 +201,7 @@ class SkipRecord:
     retryable: bool
     error: SkipError | None = None
     creative_context: dict[str, Any] = field(default_factory=dict)
+    trigger_source: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "SkipRecord":
@@ -213,6 +219,7 @@ class SkipRecord:
             retryable=bool(raw["retryable"]),
             error=SkipError.from_dict(raw["error"]) if isinstance(raw.get("error"), dict) else None,
             creative_context=dict(raw.get("creativeContext", {})),
+            trigger_source=raw.get("triggerSource"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -228,6 +235,8 @@ class SkipRecord:
         }
         if self.error is not None:
             payload["error"] = self.error.to_dict()
+        if self.trigger_source is not None:
+            payload["triggerSource"] = self.trigger_source
         if self.creative_context:
             payload["creativeContext"] = self.creative_context
         return payload
@@ -345,6 +354,11 @@ class RunContext:
     started_at: str
     repo_root: str
     trace_id: str
+    trigger_source: str = "scheduled"
+    request_id: str | None = None
+    caller_identity: str | None = None
+    correlation_id: str | None = None
+    guiding_description: str | None = None
 
 
 @dataclass(slots=True)
@@ -380,6 +394,7 @@ class RoleFailure:
         created_at: str,
         *,
         creative_context: dict[str, Any] | None = None,
+        trigger_source: str | None = None,
     ) -> SkipRecord:
         return SkipRecord(
             id=f"skip-{run_id}",
@@ -392,6 +407,7 @@ class RoleFailure:
             retryable=self.retryable,
             error=SkipError(code=self.reason_code.value, message=self.message, details=self.details),
             creative_context=creative_context or {},
+            trigger_source=trigger_source,
         )
 
 

@@ -50,11 +50,17 @@ Optional environment variables
   HOSTED_COMMIT_MESSAGE    default: chore: hosted runner update for <UTC date>
   RUN_DATE_UTC             default: current UTC date; pin this for smoke/idempotency replay
   RUN_ID                   default: scheduled-{RUN_DATE_UTC}; use for manual or concurrent runs
+  TRIGGER_SOURCE           default: scheduled; manual API calls use manual-api
+  REQUEST_ID               optional manual API idempotency key
+  CALLER_IDENTITY          optional manual API caller identity
+  CORRELATION_ID           optional cross-service correlation id
+  GUIDING_DESCRIPTION      optional Curator advisory context; never logged by this bootstrap
 
 Injected at runtime
   REPO_WORKSPACE           fresh clone path used by the hosted command
   RUN_DATE_UTC             UTC date for this hosted run
   RUN_ID                   unique run identifier for idempotency
+  TRIGGER_SOURCE           trigger source forwarded into the Python runner
   HOSTED_TRACE_ID          shared correlation id forwarded into the Python runner
 
 Usage
@@ -244,11 +250,20 @@ async function main() {
 
   const runDate = process.env.RUN_DATE_UTC?.trim() || new Date().toISOString().slice(0, 10);
   const runId = process.env.RUN_ID?.trim() || `scheduled-${runDate}`;
-  const traceId = process.env.HOSTED_TRACE_ID?.trim() || `hosted-${runId}`;
+  const triggerSource = process.env.TRIGGER_SOURCE?.trim() || "scheduled";
+  const requestId = process.env.REQUEST_ID?.trim();
+  const callerIdentity = process.env.CALLER_IDENTITY?.trim();
+  const correlationId = process.env.CORRELATION_ID?.trim();
+  const guidingDescription = process.env.GUIDING_DESCRIPTION?.trim();
+  const traceId = process.env.HOSTED_TRACE_ID?.trim() || correlationId || `hosted-${runId}`;
   setLogContext({
     runDate,
     runId,
     traceId,
+    triggerSource,
+    requestId,
+    callerIdentity,
+    correlationId,
   });
   const {
     owner,
@@ -295,6 +310,9 @@ async function main() {
     pushChanges,
     runnerCommand,
     workdir,
+    triggerSource,
+    hasGuidingDescription: Boolean(guidingDescription),
+    guidingDescriptionChars: guidingDescription?.length || 0,
   });
 
   const { token, expiresAt } = await runPhase("auth", "github_app_auth_failed", () =>
@@ -366,6 +384,11 @@ async function main() {
         REPO_WORKSPACE: clonePath,
         RUN_DATE_UTC: runDate,
         RUN_ID: runId,
+        TRIGGER_SOURCE: triggerSource,
+        REQUEST_ID: requestId,
+        CALLER_IDENTITY: callerIdentity,
+        CORRELATION_ID: correlationId,
+        GUIDING_DESCRIPTION: guidingDescription,
         HOSTED_TRACE_ID: traceId,
       },
       shell: true,

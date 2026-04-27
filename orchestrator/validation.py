@@ -256,32 +256,33 @@ def validate_skip_outcome(outcome: SkipOutcome) -> None:
 
 
 def validate_publish_state_transition(*, before: GalleryState, after: GalleryState, outcome: PublishOutcome) -> None:
-    before_run_dates = {image.effective_run_date() for room in before.rooms for image in room.images}
+    expected_run_id = outcome.image_record.effective_run_id()
+    before_run_ids = {image.effective_run_id() for room in before.rooms for image in room.images}
     after_matches = [
         (room.id, image)
         for room in after.rooms
         for image in room.images
-        if image.effective_run_date() == outcome.run_date
+        if image.effective_run_id() == expected_run_id
     ]
-    _require(len(after_matches) == 1, "post_run", "publish_transition_count_invalid", "publish must add exactly one image for the runDate", run_date=outcome.run_date)
+    _require(len(after_matches) == 1, "post_run", "publish_transition_count_invalid", "publish must add exactly one image for the runId", run_id=expected_run_id)
     added_room_id, image = after_matches[0]
     _require(added_room_id == outcome.room_id, "post_run", "publish_transition_room_invalid", "published image landed in the wrong room", expected_room=outcome.room_id, actual_room=added_room_id)
     _require(image.id == outcome.image_record.id, "post_run", "publish_transition_image_invalid", "published image id does not match outcome", image_id=image.id)
-    _require(outcome.run_date not in before_run_dates, "post_run", "publish_transition_prior_run_date", "runDate already existed before publish", run_date=outcome.run_date)
-    _require(all(skip.run_date != outcome.run_date for skip in after.skipped), "post_run", "publish_transition_skip_conflict", "publish runDate cannot also exist in skip ledger", run_date=outcome.run_date)
+    _require(expected_run_id not in before_run_ids, "post_run", "publish_transition_prior_run_id", "runId already existed before publish", run_id=expected_run_id)
+    _require(all(skip.run_id != expected_run_id for skip in after.skipped), "post_run", "publish_transition_skip_conflict", "publish runId cannot also exist in skip ledger", run_id=expected_run_id)
 
 
 def validate_skip_state_transition(*, before: GalleryState, after: GalleryState, outcome: SkipOutcome) -> None:
-    before_skip_dates = {skip.run_date for skip in before.skipped}
-    after_skip_matches = [skip for skip in after.skipped if skip.run_date == outcome.run_date]
-    _require(len(after_skip_matches) == 1, "post_run", "skip_transition_count_invalid", "skip must add exactly one skip record for the runDate", run_date=outcome.run_date)
-    _require(outcome.run_date not in before_skip_dates, "post_run", "skip_transition_prior_run_date", "runDate already existed before skip", run_date=outcome.run_date)
+    before_skip_run_ids = {skip.run_id for skip in before.skipped}
+    after_skip_matches = [skip for skip in after.skipped if skip.run_id == outcome.skip_record.run_id]
+    _require(len(after_skip_matches) == 1, "post_run", "skip_transition_count_invalid", "skip must add exactly one skip record for the runId", run_id=outcome.skip_record.run_id)
+    _require(outcome.skip_record.run_id not in before_skip_run_ids, "post_run", "skip_transition_prior_run_id", "runId already existed before skip", run_id=outcome.skip_record.run_id)
     _require(
-        all(image.effective_run_date() != outcome.run_date for room in after.rooms for image in room.images),
+        all(image.effective_run_id() != outcome.skip_record.run_id for room in after.rooms for image in room.images),
         "post_run",
         "skip_transition_publish_conflict",
-        "skip runDate cannot also exist in image ledger",
-        run_date=outcome.run_date,
+        "skip runId cannot also exist in image ledger",
+        run_id=outcome.skip_record.run_id,
     )
 
 
@@ -292,7 +293,7 @@ def validate_skip_record(skip, *, category: str, require_error: bool) -> None:
     _require(bool(skip.reason_code), category, "skip_reason_code_missing", "skip reasonCode is required")
     _require(bool(skip.message.strip()), category, "skip_message_missing", "skip message is required")
     _require(bool(skip.created_at), category, "skip_created_at_missing", "skip createdAt is required")
-    _require(skip.id == f"skip-{skip.run_date}", category, "skip_id_invalid", "skip id must match skip-<runDate>", skip_id=skip.id)
+    _require(skip.id == f"skip-{skip.run_id}", category, "skip_id_invalid", "skip id must match skip-<runId>", skip_id=skip.id)
     if skip.error is not None:
         _require(bool(skip.error.code), category, "skip_error_code_missing", "skip error code is required")
         _require(bool(skip.error.message.strip()), category, "skip_error_message_missing", "skip error message is required")
@@ -305,6 +306,7 @@ def validate_skip_record(skip, *, category: str, require_error: bool) -> None:
 def validate_new_image_record(image: GalleryImageRecord, *, expected_run_date: str) -> None:
     validate_existing_image_record(image)
     _require(image.run_date == expected_run_date, "post_run", "image_run_date_missing", "new image record must carry the expected runDate", expected_run_date=expected_run_date)
+    _require(bool(image.run_id), "post_run", "image_run_id_missing", "new image record must carry runId")
     _require(bool(image.prompt_summary), "post_run", "image_prompt_summary_missing", "new image record must include promptSummary")
     _require(bool(image.model), "post_run", "image_model_missing", "new image record must include model deployment")
     _require(bool(image.reasoning_model), "post_run", "image_reasoning_model_missing", "new image record must include reasoningModel deployment")

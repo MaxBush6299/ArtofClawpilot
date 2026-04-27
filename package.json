@@ -10,7 +10,10 @@
     "daily": "node scripts/run-daily.mjs",
     "hosted:bootstrap": "node scripts/hosted-bootstrap.mjs",
     "orchestrator:proof": "python scripts\\orchestrator_proof.py",
-    "rebuild-routes": "node scripts/rebuild-routes.mjs"
+    "rebuild-routes": "node scripts/rebuild-routes.mjs",
+    "api:build": "npm --prefix api run build",
+    "api:check": "npm --prefix api run check",
+    "api:start": "npm --prefix api start"
   },
   "dependencies": {
     "@azure/identity": "^4.4.0",

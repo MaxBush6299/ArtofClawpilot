@@ -88,6 +88,7 @@ def run_scenario(scenario: Scenario) -> None:
 
     command = [
         sys.executable,
+        "-B",
         "-m",
         "orchestrator.main",
         "--repo-root",
@@ -236,13 +237,14 @@ def seed_same_day_publish(repo_root: Path) -> None:
     room = gallery["rooms"][0]
     room["images"].append(
         {
-            "id": RUN_DATE,
+            "id": f"scheduled-{RUN_DATE}",
             "title": "Already Resolved Piece",
             "path": f"/gallery/{RUN_DATE[:4]}/{RUN_DATE}-already-resolved-piece.png",
             "createdAt": f"{RUN_DATE}T00:00:00+00:00",
             "artistNote": "Seeded same-day image for idempotent no-op proof.",
             "promptSummary": "A same-day seeded image for rerun proof.",
             "runDate": RUN_DATE,
+            "runId": f"scheduled-{RUN_DATE}",
             "model": "MAI-Image-2e",
             "reasoningModel": "grok-4-20-reasoning",
             "slug": "already-resolved-piece",

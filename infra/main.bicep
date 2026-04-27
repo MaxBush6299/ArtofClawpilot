@@ -6,9 +6,12 @@
 //   - Log Analytics + Container Apps managed environment
 //   - User-assigned managed identity for the hosted daily runner
 //   - Manual-first Azure Container Apps Job shell for the hosted runner
+//   - Azure Function App HTTP API shell for internal manual run triggers
 //   - Role assignments so the job identity can read Key Vault secrets,
 //     call the existing Foundry / Azure AI Services resource, and optionally
 //     pull from Azure Container Registry with managed identity
+//   - Role assignments so the Function identity can read the API key secret
+//     and start the existing Container Apps Job with per-run overrides
 
 targetScope = 'resourceGroup'
 
@@ -124,6 +127,46 @@ param hostedTriggerSource string = 'scheduled'
 @description('Whether the hosted bootstrap should push changes when the runner command mutates the clone.')
 param hostedPushChanges bool = false
 
+@description('Linux Functions worker runtime for the internal Clawpilot API. Keep aligned with Kyle API code at deployment time.')
+@allowed([
+  'node'
+  'python'
+])
+param functionWorkerRuntime string = 'node'
+
+@description('Flex Consumption runtime version for the internal Clawpilot API. Default is Node.js 20 for the planned JavaScript API implementation.')
+@allowed([
+  '20'
+  '3.11'
+])
+param functionRuntimeVersion string = '20'
+
+@description('Maximum scale-out instance count for the Function App on Flex Consumption.')
+@minValue(40)
+@maxValue(1000)
+param functionMaximumInstanceCount int = 40
+
+@description('Memory size in MB for Function App instances on Flex Consumption.')
+@allowed([
+  2048
+  4096
+])
+param functionInstanceMemoryMB int = 2048
+
+@description('Key Vault secret name containing the Phase 1 Clawpilot API key.')
+param clawpilotApiKeySecretName string = 'clawpilot-api-key'
+
+@description('Optional initial value for the Clawpilot API key secret. Leave empty to avoid writing a secret from deployment; create/rotate it post-deploy with az keyvault secret set.')
+@secure()
+param clawpilotApiKey string = ''
+
+@description('Built-in role assigned to the Function identity at the Container Apps Job scope. Default is Container Apps Jobs Operator, which can read and start jobs. Use Container Apps Jobs Contributor only if Kyle API code must persistently update the job definition before starting it.')
+@allowed([
+  'b9a307c4-5aa3-4b52-ba60-2b17c136cd7b'
+  '4e3d2b60-56ae-4dc6-a233-09c8e5a82e68'
+])
+param functionContainerAppsJobRoleDefinitionId string = 'b9a307c4-5aa3-4b52-ba60-2b17c136cd7b'
+
 var suffix = uniqueString(resourceGroup().id, namePrefix)
 var swaName = '${namePrefix}-swa-${suffix}'
 var kvName = take('${namePrefix}kv${suffix}', 24)
@@ -131,14 +174,28 @@ var workspaceName = '${namePrefix}-logs-${suffix}'
 var managedEnvironmentName = '${namePrefix}-acae-${suffix}'
 var jobIdentityName = '${namePrefix}-job-mi-${suffix}'
 var dailyJobName = '${namePrefix}-daily-job-${suffix}'
+var functionStorageName = take('${namePrefix}fnst${suffix}', 24)
+var functionPlanName = '${namePrefix}-api-plan-${suffix}'
+var functionIdentityName = '${namePrefix}-api-mi-${suffix}'
+var functionAppName = '${namePrefix}-api-${suffix}'
+var functionAppInsightsName = '${namePrefix}-api-ai-${suffix}'
+var functionDeploymentContainerName = 'app-package-${take(functionAppName, 32)}-${take(suffix, 7)}'
 
 var roleKeyVaultSecretsUser = '4633458b-17de-408a-b874-0445c86b69e6'
 var roleCognitiveServicesUser = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 var roleAcrPull = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+var roleStorageBlobDataOwner = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+var roleStorageQueueDataContributor = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+var roleStorageTableDataContributor = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+var roleMonitoringMetricsPublisher = '3913510d-42f4-4e42-8a64-420c390055eb'
 var hasGitHubAppConfig = !empty(githubAppPrivateKey) && githubAppId != 'replace-me' && githubAppInstallationId != 'replace-me'
 
 var jobIdentityMap = {
   '${jobIdentity.id}': {}
+}
+
+var functionIdentityMap = {
+  '${functionIdentity.id}': {}
 }
 
 var foundryJobSecretSpecs = [
@@ -454,6 +511,14 @@ resource secretGitHubAppPrivateKey 'Microsoft.KeyVault/vaults/secrets@2024-04-01
   }
 }
 
+resource secretClawpilotApiKey 'Microsoft.KeyVault/vaults/secrets@2024-04-01-preview' = if (!empty(clawpilotApiKey)) {
+  parent: keyVault
+  name: clawpilotApiKeySecretName
+  properties: {
+    value: clawpilotApiKey
+  }
+}
+
 // -------------------- Hosted runner identity --------------------
 resource jobIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: jobIdentityName
@@ -546,6 +611,202 @@ resource hostedDailyRunnerJob 'Microsoft.App/jobs@2024-03-01' = {
   }
 }
 
+// -------------------- Internal manual-run API --------------------
+resource functionIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: functionIdentityName
+  location: location
+}
+
+resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: functionStorageName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
+    defaultToOAuthAuthentication: true
+    minimumTlsVersion: 'TLS1_2'
+    publicNetworkAccess: 'Enabled'
+    supportsHttpsTrafficOnly: true
+  }
+
+  resource blobService 'blobServices' = {
+    name: 'default'
+
+    resource deploymentContainer 'containers' = {
+      name: functionDeploymentContainerName
+      properties: {
+        publicAccess: 'None'
+      }
+    }
+  }
+}
+
+resource functionPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
+  name: functionPlanName
+  location: location
+  kind: 'functionapp'
+  sku: {
+    name: 'FC1'
+    tier: 'FlexConsumption'
+  }
+  properties: {
+    reserved: true
+  }
+}
+
+resource functionAppInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: functionAppInsightsName
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    DisableLocalAuth: true
+    WorkspaceResourceId: logAnalytics.id
+  }
+}
+
+resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
+  name: functionAppName
+  location: location
+  kind: 'functionapp,linux'
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: functionIdentityMap
+  }
+  properties: {
+    serverFarmId: functionPlan.id
+    httpsOnly: true
+    clientAffinityEnabled: false
+    siteConfig: {
+      ftpsState: 'Disabled'
+      minTlsVersion: '1.2'
+    }
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${functionStorage.properties.primaryEndpoints.blob}${functionDeploymentContainerName}'
+          authentication: {
+            type: 'UserAssignedIdentity'
+            userAssignedIdentityResourceId: functionIdentity.id
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: functionMaximumInstanceCount
+        instanceMemoryMB: functionInstanceMemoryMB
+      }
+      runtime: {
+        name: functionWorkerRuntime
+        version: functionRuntimeVersion
+      }
+    }
+  }
+  dependsOn: [
+    functionStorageBlobOwner
+    functionStorageQueueContributor
+    functionStorageTableContributor
+    functionAppInsightsMetricsPublisher
+  ]
+}
+
+resource functionAppSettings 'Microsoft.Web/sites/config@2024-04-01' = {
+  parent: functionApp
+  name: 'appsettings'
+  properties: {
+    AzureWebJobsStorage__accountName: functionStorage.name
+    AzureWebJobsStorage__credential: 'managedidentity'
+    AzureWebJobsStorage__clientId: functionIdentity.properties.clientId
+    AzureWebJobsStorage__blobServiceUri: functionStorage.properties.primaryEndpoints.blob
+    AzureWebJobsStorage__queueServiceUri: functionStorage.properties.primaryEndpoints.queue
+    AzureWebJobsStorage__tableServiceUri: functionStorage.properties.primaryEndpoints.table
+    APPLICATIONINSIGHTS_CONNECTION_STRING: functionAppInsights.properties.ConnectionString
+    APPINSIGHTS_INSTRUMENTATIONKEY: functionAppInsights.properties.InstrumentationKey
+    APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${functionIdentity.properties.clientId};Authorization=AAD'
+    AZURE_CLIENT_ID: functionIdentity.properties.clientId
+    AZURE_SUBSCRIPTION_ID: subscription().subscriptionId
+    AZURE_TENANT_ID: subscription().tenantId
+    KEY_VAULT_URL: keyVault.properties.vaultUri
+    CLAWPILOT_API_KEY_SECRET_NAME: clawpilotApiKeySecretName
+    AZURE_RESOURCE_GROUP: resourceGroup().name
+    RESOURCE_GROUP_NAME: resourceGroup().name
+    CONTAINER_APP_JOB_RESOURCE_GROUP: resourceGroup().name
+    CONTAINER_APP_JOB_NAME: hostedDailyRunnerJob.name
+    CONTAINER_APP_JOB_CONTAINER_NAME: 'runner'
+    CONTAINER_APP_JOB_RESOURCE_ID: hostedDailyRunnerJob.id
+    CONTAINER_APP_ENVIRONMENT_NAME: managedEnvironment.name
+    CONTAINER_APP_ENVIRONMENT_ID: managedEnvironment.id
+    GITHUB_OWNER: githubOwner
+    GITHUB_REPO: githubRepo
+    GITHUB_BRANCH: githubBranch
+    DEFAULT_TRIGGER_SOURCE: 'manual-api'
+  }
+}
+
+resource functionStorageBlobOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(functionStorage.id, functionIdentity.id, roleStorageBlobDataOwner)
+  scope: functionStorage
+  properties: {
+    principalId: functionIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageBlobDataOwner)
+  }
+}
+
+resource functionStorageQueueContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(functionStorage.id, functionIdentity.id, roleStorageQueueDataContributor)
+  scope: functionStorage
+  properties: {
+    principalId: functionIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageQueueDataContributor)
+  }
+}
+
+resource functionStorageTableContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(functionStorage.id, functionIdentity.id, roleStorageTableDataContributor)
+  scope: functionStorage
+  properties: {
+    principalId: functionIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleStorageTableDataContributor)
+  }
+}
+
+resource functionAppInsightsMetricsPublisher 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(functionAppInsights.id, functionIdentity.id, roleMonitoringMetricsPublisher)
+  scope: functionAppInsights
+  properties: {
+    principalId: functionIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleMonitoringMetricsPublisher)
+  }
+}
+
+resource functionKvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, functionIdentity.id, roleKeyVaultSecretsUser)
+  scope: keyVault
+  properties: {
+    principalId: functionIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleKeyVaultSecretsUser)
+  }
+}
+
+resource functionJobOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(hostedDailyRunnerJob.id, functionIdentity.id, functionContainerAppsJobRoleDefinitionId)
+  scope: hostedDailyRunnerJob
+  properties: {
+    principalId: functionIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', functionContainerAppsJobRoleDefinitionId)
+  }
+}
+
 // -------------------- Outputs --------------------
 output swaHostname string = swa.properties.defaultHostname
 output keyVaultName string = keyVault.name
@@ -559,3 +820,10 @@ output jobIdentityPrincipalId string = jobIdentity.properties.principalId
 output jobIdentityClientId string = jobIdentity.properties.clientId
 output hostedRunDateOverrideApplied string = hostedRunDateOverride
 output githubAppConfigApplied bool = hasGitHubAppConfig
+output functionAppName string = functionApp.name
+output functionAppDefaultHostname string = functionApp.properties.defaultHostName
+output functionIdentityPrincipalId string = functionIdentity.properties.principalId
+output functionIdentityClientId string = functionIdentity.properties.clientId
+output functionAppInsightsName string = functionAppInsights.name
+output clawpilotApiKeySecretName string = clawpilotApiKeySecretName
+output functionContainerAppsJobRoleDefinitionId string = functionContainerAppsJobRoleDefinitionId

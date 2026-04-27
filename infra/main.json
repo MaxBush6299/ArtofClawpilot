@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.39.26.7824",
-      "templateHash": "3570727268666610026"
+      "templateHash": "15149458226454626557"
     }
   },
   "parameters": {
@@ -212,7 +212,7 @@
     },
     "hostedRunnerCommand": {
       "type": "string",
-      "defaultValue": "python3 -m orchestrator.main --repo-root \"$REPO_WORKSPACE\" --run-date \"$RUN_DATE_UTC\"",
+      "defaultValue": "python3 -m orchestrator.main --repo-root \"$REPO_WORKSPACE\" --run-date \"$RUN_DATE_UTC\" --run-id \"$RUN_ID\"",
       "metadata": {
         "description": "Optional command executed inside the fresh clone before any commit/push step."
       }
@@ -224,11 +224,97 @@
         "description": "Optional fixed UTC run date injected into the hosted runner. Useful for hosted smoke and idempotency replay."
       }
     },
+    "hostedRunId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional run identifier for manual execution. Scheduled runs use runId=scheduled-{runDate}."
+      }
+    },
+    "hostedTriggerSource": {
+      "type": "string",
+      "defaultValue": "scheduled",
+      "allowedValues": [
+        "scheduled",
+        "manual-api",
+        "manual-cli"
+      ],
+      "metadata": {
+        "description": "Trigger source for this execution: scheduled, manual-api, or manual-cli."
+      }
+    },
     "hostedPushChanges": {
       "type": "bool",
       "defaultValue": false,
       "metadata": {
         "description": "Whether the hosted bootstrap should push changes when the runner command mutates the clone."
+      }
+    },
+    "functionWorkerRuntime": {
+      "type": "string",
+      "defaultValue": "node",
+      "allowedValues": [
+        "node",
+        "python"
+      ],
+      "metadata": {
+        "description": "Linux Functions worker runtime for the internal Clawpilot API. Keep aligned with Kyle API code at deployment time."
+      }
+    },
+    "functionRuntimeVersion": {
+      "type": "string",
+      "defaultValue": "20",
+      "allowedValues": [
+        "20",
+        "3.11"
+      ],
+      "metadata": {
+        "description": "Flex Consumption runtime version for the internal Clawpilot API. Default is Node.js 20 for the planned JavaScript API implementation."
+      }
+    },
+    "functionMaximumInstanceCount": {
+      "type": "int",
+      "defaultValue": 40,
+      "minValue": 40,
+      "maxValue": 1000,
+      "metadata": {
+        "description": "Maximum scale-out instance count for the Function App on Flex Consumption."
+      }
+    },
+    "functionInstanceMemoryMB": {
+      "type": "int",
+      "defaultValue": 2048,
+      "allowedValues": [
+        2048,
+        4096
+      ],
+      "metadata": {
+        "description": "Memory size in MB for Function App instances on Flex Consumption."
+      }
+    },
+    "clawpilotApiKeySecretName": {
+      "type": "string",
+      "defaultValue": "clawpilot-api-key",
+      "metadata": {
+        "description": "Key Vault secret name containing the Phase 1 Clawpilot API key."
+      }
+    },
+    "clawpilotApiKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional initial value for the Clawpilot API key secret. Leave empty to avoid writing a secret from deployment; create/rotate it post-deploy with az keyvault secret set."
+      }
+    },
+    "functionContainerAppsJobRoleDefinitionId": {
+      "type": "string",
+      "defaultValue": "b9a307c4-5aa3-4b52-ba60-2b17c136cd7b",
+      "allowedValues": [
+        "b9a307c4-5aa3-4b52-ba60-2b17c136cd7b",
+        "4e3d2b60-56ae-4dc6-a233-09c8e5a82e68"
+      ],
+      "metadata": {
+        "description": "Built-in role assigned to the Function identity at the Container Apps Job scope. Default is Container Apps Jobs Operator, which can read and start jobs. Use Container Apps Jobs Contributor only if Kyle API code must persistently update the job definition before starting it."
       }
     }
   },
@@ -240,15 +326,47 @@
     "managedEnvironmentName": "[format('{0}-acae-{1}', parameters('namePrefix'), variables('suffix'))]",
     "jobIdentityName": "[format('{0}-job-mi-{1}', parameters('namePrefix'), variables('suffix'))]",
     "dailyJobName": "[format('{0}-daily-job-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "functionStorageName": "[take(format('{0}fnst{1}', parameters('namePrefix'), variables('suffix')), 24)]",
+    "functionPlanName": "[format('{0}-api-plan-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "functionIdentityName": "[format('{0}-api-mi-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "functionAppName": "[format('{0}-api-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "functionAppInsightsName": "[format('{0}-api-ai-{1}', parameters('namePrefix'), variables('suffix'))]",
+    "functionDeploymentContainerName": "[format('app-package-{0}-{1}', take(variables('functionAppName'), 32), take(variables('suffix'), 7))]",
     "roleKeyVaultSecretsUser": "4633458b-17de-408a-b874-0445c86b69e6",
     "roleCognitiveServicesUser": "a97b65f3-24c7-4388-baec-2e87135dc908",
     "roleAcrPull": "7f951dda-4ed3-4680-a7ca-43fe172d538d",
+    "roleStorageBlobDataOwner": "b7e6dc6d-f1e8-4753-8033-0f276bb0955b",
+    "roleStorageQueueDataContributor": "974c5e8b-45b9-4653-ba55-5f855dd0fb88",
+    "roleStorageTableDataContributor": "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3",
+    "roleMonitoringMetricsPublisher": "3913510d-42f4-4e42-8a64-420c390055eb",
     "hasGitHubAppConfig": "[and(and(not(empty(parameters('githubAppPrivateKey'))), not(equals(parameters('githubAppId'), 'replace-me'))), not(equals(parameters('githubAppInstallationId'), 'replace-me')))]",
     "jobIdentityMap": {
       "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')))]": {}
+    },
+    "functionIdentityMap": {
+      "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')))]": {}
     }
   },
   "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}/{2}', variables('functionStorageName'), 'default', variables('functionDeploymentContainerName'))]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('functionStorageName'), 'default')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/{1}', variables('functionStorageName'), 'default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName'))]"
+      ]
+    },
     {
       "type": "Microsoft.Web/staticSites",
       "apiVersion": "2024-04-01",
@@ -404,6 +522,18 @@
       ]
     },
     {
+      "condition": "[not(empty(parameters('clawpilotApiKey')))]",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2024-04-01-preview",
+      "name": "[format('{0}/{1}', variables('kvName'), parameters('clawpilotApiKeySecretName'))]",
+      "properties": {
+        "value": "[parameters('clawpilotApiKey')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
       "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
       "apiVersion": "2023-01-31",
       "name": "[variables('jobIdentityName')]",
@@ -475,7 +605,7 @@
                 "node",
                 "scripts/hosted-bootstrap.mjs"
               ],
-              "env": "[if(empty(parameters('hostedRunDateOverride')), concat(createArray(createObject('name', 'HOSTED_JOB_NAME', 'value', variables('dailyJobName')), createObject('name', 'AZURE_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').clientId), createObject('name', 'KEY_VAULT_URL', 'value', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri), createObject('name', 'FOUNDRY_REASONING_ENDPOINT', 'secretRef', 'foundry-reasoning-endpoint'), createObject('name', 'FOUNDRY_IMAGE_ENDPOINT', 'secretRef', 'foundry-image-endpoint'), createObject('name', 'FOUNDRY_ENDPOINT', 'secretRef', 'foundry-endpoint'), createObject('name', 'FOUNDRY_REASONING_DEPLOYMENT', 'secretRef', 'foundry-reasoning-deployment'), createObject('name', 'FOUNDRY_REASONING_API_VERSION', 'secretRef', 'foundry-reasoning-api-version'), createObject('name', 'FOUNDRY_IMAGE_DEPLOYMENT', 'secretRef', 'foundry-image-deployment'), createObject('name', 'FOUNDRY_DEPLOYMENT', 'secretRef', 'foundry-deployment'), createObject('name', 'GITHUB_OWNER', 'value', parameters('githubOwner')), createObject('name', 'GITHUB_REPO', 'value', parameters('githubRepo')), createObject('name', 'GITHUB_BRANCH', 'value', parameters('githubBranch')), createObject('name', 'GIT_AUTHOR_NAME', 'value', parameters('gitAuthorName')), createObject('name', 'GIT_AUTHOR_EMAIL', 'value', parameters('gitAuthorEmail')), createObject('name', 'HOSTED_RUNNER_COMMAND', 'value', parameters('hostedRunnerCommand')), createObject('name', 'PYTHONUNBUFFERED', 'value', '1'), createObject('name', 'PYTHONDONTWRITEBYTECODE', 'value', '1'), createObject('name', 'HOSTED_PUSH_CHANGES', 'value', if(parameters('hostedPushChanges'), 'true', 'false'))), if(variables('hasGitHubAppConfig'), createArray(createObject('name', 'GITHUB_APP_ID', 'secretRef', 'github-app-id'), createObject('name', 'GITHUB_APP_INSTALLATION_ID', 'secretRef', 'github-app-installation-id'), createObject('name', 'GITHUB_APP_PRIVATE_KEY', 'secretRef', 'github-app-private-key')), createArray())), concat(concat(createArray(createObject('name', 'HOSTED_JOB_NAME', 'value', variables('dailyJobName')), createObject('name', 'AZURE_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').clientId), createObject('name', 'KEY_VAULT_URL', 'value', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri), createObject('name', 'FOUNDRY_REASONING_ENDPOINT', 'secretRef', 'foundry-reasoning-endpoint'), createObject('name', 'FOUNDRY_IMAGE_ENDPOINT', 'secretRef', 'foundry-image-endpoint'), createObject('name', 'FOUNDRY_ENDPOINT', 'secretRef', 'foundry-endpoint'), createObject('name', 'FOUNDRY_REASONING_DEPLOYMENT', 'secretRef', 'foundry-reasoning-deployment'), createObject('name', 'FOUNDRY_REASONING_API_VERSION', 'secretRef', 'foundry-reasoning-api-version'), createObject('name', 'FOUNDRY_IMAGE_DEPLOYMENT', 'secretRef', 'foundry-image-deployment'), createObject('name', 'FOUNDRY_DEPLOYMENT', 'secretRef', 'foundry-deployment'), createObject('name', 'GITHUB_OWNER', 'value', parameters('githubOwner')), createObject('name', 'GITHUB_REPO', 'value', parameters('githubRepo')), createObject('name', 'GITHUB_BRANCH', 'value', parameters('githubBranch')), createObject('name', 'GIT_AUTHOR_NAME', 'value', parameters('gitAuthorName')), createObject('name', 'GIT_AUTHOR_EMAIL', 'value', parameters('gitAuthorEmail')), createObject('name', 'HOSTED_RUNNER_COMMAND', 'value', parameters('hostedRunnerCommand')), createObject('name', 'PYTHONUNBUFFERED', 'value', '1'), createObject('name', 'PYTHONDONTWRITEBYTECODE', 'value', '1'), createObject('name', 'HOSTED_PUSH_CHANGES', 'value', if(parameters('hostedPushChanges'), 'true', 'false'))), if(variables('hasGitHubAppConfig'), createArray(createObject('name', 'GITHUB_APP_ID', 'secretRef', 'github-app-id'), createObject('name', 'GITHUB_APP_INSTALLATION_ID', 'secretRef', 'github-app-installation-id'), createObject('name', 'GITHUB_APP_PRIVATE_KEY', 'secretRef', 'github-app-private-key')), createArray())), createArray(createObject('name', 'RUN_DATE_UTC', 'value', parameters('hostedRunDateOverride')))))]",
+              "env": "[concat(concat(createArray(createObject('name', 'HOSTED_JOB_NAME', 'value', variables('dailyJobName')), createObject('name', 'AZURE_CLIENT_ID', 'value', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName')), '2023-01-31').clientId), createObject('name', 'KEY_VAULT_URL', 'value', reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri), createObject('name', 'FOUNDRY_REASONING_ENDPOINT', 'secretRef', 'foundry-reasoning-endpoint'), createObject('name', 'FOUNDRY_IMAGE_ENDPOINT', 'secretRef', 'foundry-image-endpoint'), createObject('name', 'FOUNDRY_ENDPOINT', 'secretRef', 'foundry-endpoint'), createObject('name', 'FOUNDRY_REASONING_DEPLOYMENT', 'secretRef', 'foundry-reasoning-deployment'), createObject('name', 'FOUNDRY_REASONING_API_VERSION', 'secretRef', 'foundry-reasoning-api-version'), createObject('name', 'FOUNDRY_IMAGE_DEPLOYMENT', 'secretRef', 'foundry-image-deployment'), createObject('name', 'FOUNDRY_DEPLOYMENT', 'secretRef', 'foundry-deployment'), createObject('name', 'GITHUB_OWNER', 'value', parameters('githubOwner')), createObject('name', 'GITHUB_REPO', 'value', parameters('githubRepo')), createObject('name', 'GITHUB_BRANCH', 'value', parameters('githubBranch')), createObject('name', 'GIT_AUTHOR_NAME', 'value', parameters('gitAuthorName')), createObject('name', 'GIT_AUTHOR_EMAIL', 'value', parameters('gitAuthorEmail')), createObject('name', 'HOSTED_RUNNER_COMMAND', 'value', parameters('hostedRunnerCommand')), createObject('name', 'PYTHONUNBUFFERED', 'value', '1'), createObject('name', 'PYTHONDONTWRITEBYTECODE', 'value', '1'), createObject('name', 'HOSTED_PUSH_CHANGES', 'value', if(parameters('hostedPushChanges'), 'true', 'false'))), if(variables('hasGitHubAppConfig'), createArray(createObject('name', 'GITHUB_APP_ID', 'secretRef', 'github-app-id'), createObject('name', 'GITHUB_APP_INSTALLATION_ID', 'secretRef', 'github-app-installation-id'), createObject('name', 'GITHUB_APP_PRIVATE_KEY', 'secretRef', 'github-app-private-key')), createArray())), if(not(empty(parameters('hostedRunDateOverride'))), createArray(createObject('name', 'RUN_DATE_UTC', 'value', parameters('hostedRunDateOverride'))), createArray()), createArray(createObject('name', 'RUN_ID', 'value', if(not(empty(parameters('hostedRunId'))), parameters('hostedRunId'), '')), createObject('name', 'TRIGGER_SOURCE', 'value', parameters('hostedTriggerSource'))))]",
               "resources": {
                 "cpu": "[json(parameters('jobCpu'))]",
                 "memory": "[parameters('jobMemory')]"
@@ -488,6 +618,240 @@
         "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('jobIdentityName'))]",
         "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]",
         "[resourceId('Microsoft.App/managedEnvironments', variables('managedEnvironmentName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[variables('functionIdentityName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('functionStorageName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false,
+        "defaultToOAuthAuthentication": true,
+        "minimumTlsVersion": "TLS1_2",
+        "publicNetworkAccess": "Enabled",
+        "supportsHttpsTrafficOnly": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('functionPlanName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp",
+      "sku": {
+        "name": "FC1",
+        "tier": "FlexConsumption"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[variables('functionAppInsightsName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "DisableLocalAuth": true,
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[variables('functionAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "functionapp,linux",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": "[variables('functionIdentityMap')]"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('functionPlanName'))]",
+        "httpsOnly": true,
+        "clientAffinityEnabled": false,
+        "siteConfig": {
+          "ftpsState": "Disabled",
+          "minTlsVersion": "1.2"
+        },
+        "functionAppConfig": {
+          "deployment": {
+            "storage": {
+              "type": "blobContainer",
+              "value": "[format('{0}{1}', reference(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), '2023-05-01').primaryEndpoints.blob, variables('functionDeploymentContainerName'))]",
+              "authentication": {
+                "type": "UserAssignedIdentity",
+                "userAssignedIdentityResourceId": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]"
+              }
+            }
+          },
+          "scaleAndConcurrency": {
+            "maximumInstanceCount": "[parameters('functionMaximumInstanceCount')]",
+            "instanceMemoryMB": "[parameters('functionInstanceMemoryMB')]"
+          },
+          "runtime": {
+            "name": "[parameters('functionWorkerRuntime')]",
+            "version": "[parameters('functionRuntimeVersion')]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(resourceId('Microsoft.Insights/components', variables('functionAppInsightsName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.Insights/components', variables('functionAppInsightsName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleMonitoringMetricsPublisher')))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', variables('functionPlanName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName'))]",
+        "[extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleStorageBlobDataOwner')))]",
+        "[extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleStorageQueueDataContributor')))]",
+        "[extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleStorageTableDataContributor')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites/config",
+      "apiVersion": "2024-04-01",
+      "name": "[format('{0}/{1}', variables('functionAppName'), 'appsettings')]",
+      "properties": {
+        "AzureWebJobsStorage__accountName": "[variables('functionStorageName')]",
+        "AzureWebJobsStorage__credential": "managedidentity",
+        "AzureWebJobsStorage__clientId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').clientId]",
+        "AzureWebJobsStorage__blobServiceUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), '2023-05-01').primaryEndpoints.blob]",
+        "AzureWebJobsStorage__queueServiceUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), '2023-05-01').primaryEndpoints.queue]",
+        "AzureWebJobsStorage__tableServiceUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), '2023-05-01').primaryEndpoints.table]",
+        "APPLICATIONINSIGHTS_CONNECTION_STRING": "[reference(resourceId('Microsoft.Insights/components', variables('functionAppInsightsName')), '2020-02-02').ConnectionString]",
+        "APPINSIGHTS_INSTRUMENTATIONKEY": "[reference(resourceId('Microsoft.Insights/components', variables('functionAppInsightsName')), '2020-02-02').InstrumentationKey]",
+        "APPLICATIONINSIGHTS_AUTHENTICATION_STRING": "[format('ClientId={0};Authorization=AAD', reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').clientId)]",
+        "AZURE_CLIENT_ID": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').clientId]",
+        "AZURE_SUBSCRIPTION_ID": "[subscription().subscriptionId]",
+        "AZURE_TENANT_ID": "[subscription().tenantId]",
+        "KEY_VAULT_URL": "[reference(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), '2024-04-01-preview').vaultUri]",
+        "CLAWPILOT_API_KEY_SECRET_NAME": "[parameters('clawpilotApiKeySecretName')]",
+        "AZURE_RESOURCE_GROUP": "[resourceGroup().name]",
+        "RESOURCE_GROUP_NAME": "[resourceGroup().name]",
+        "CONTAINER_APP_JOB_RESOURCE_GROUP": "[resourceGroup().name]",
+        "CONTAINER_APP_JOB_NAME": "[variables('dailyJobName')]",
+        "CONTAINER_APP_JOB_CONTAINER_NAME": "runner",
+        "CONTAINER_APP_JOB_RESOURCE_ID": "[resourceId('Microsoft.App/jobs', variables('dailyJobName'))]",
+        "CONTAINER_APP_ENVIRONMENT_NAME": "[variables('managedEnvironmentName')]",
+        "CONTAINER_APP_ENVIRONMENT_ID": "[resourceId('Microsoft.App/managedEnvironments', variables('managedEnvironmentName'))]",
+        "GITHUB_OWNER": "[parameters('githubOwner')]",
+        "GITHUB_REPO": "[parameters('githubRepo')]",
+        "GITHUB_BRANCH": "[parameters('githubBranch')]",
+        "DEFAULT_TRIGGER_SOURCE": "manual-api"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('functionAppName'))]",
+        "[resourceId('Microsoft.Insights/components', variables('functionAppInsightsName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName'))]",
+        "[resourceId('Microsoft.App/jobs', variables('dailyJobName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]",
+        "[resourceId('Microsoft.App/managedEnvironments', variables('managedEnvironmentName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}', variables('functionStorageName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleStorageBlobDataOwner'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleStorageBlobDataOwner'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}', variables('functionStorageName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleStorageQueueDataContributor'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleStorageQueueDataContributor'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}', variables('functionStorageName'))]",
+      "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleStorageTableDataContributor'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleStorageTableDataContributor'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('functionStorageName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Insights/components/{0}', variables('functionAppInsightsName'))]",
+      "name": "[guid(resourceId('Microsoft.Insights/components', variables('functionAppInsightsName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleMonitoringMetricsPublisher'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleMonitoringMetricsPublisher'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', variables('functionAppInsightsName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.KeyVault/vaults/{0}', variables('kvName'))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', variables('kvName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), variables('roleKeyVaultSecretsUser'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('roleKeyVaultSecretsUser'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('kvName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.App/jobs/{0}', variables('dailyJobName'))]",
+      "name": "[guid(resourceId('Microsoft.App/jobs', variables('dailyJobName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), parameters('functionContainerAppsJobRoleDefinitionId'))]",
+      "properties": {
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal",
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('functionContainerAppsJobRoleDefinitionId'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName'))]",
+        "[resourceId('Microsoft.App/jobs', variables('dailyJobName'))]"
       ]
     },
     {
@@ -682,6 +1046,34 @@
     "githubAppConfigApplied": {
       "type": "bool",
       "value": "[variables('hasGitHubAppConfig')]"
+    },
+    "functionAppName": {
+      "type": "string",
+      "value": "[variables('functionAppName')]"
+    },
+    "functionAppDefaultHostname": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', variables('functionAppName')), '2024-04-01').defaultHostName]"
+    },
+    "functionIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').principalId]"
+    },
+    "functionIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('functionIdentityName')), '2023-01-31').clientId]"
+    },
+    "functionAppInsightsName": {
+      "type": "string",
+      "value": "[variables('functionAppInsightsName')]"
+    },
+    "clawpilotApiKeySecretName": {
+      "type": "string",
+      "value": "[parameters('clawpilotApiKeySecretName')]"
+    },
+    "functionContainerAppsJobRoleDefinitionId": {
+      "type": "string",
+      "value": "[parameters('functionContainerAppsJobRoleDefinitionId')]"
     }
   }
 }
