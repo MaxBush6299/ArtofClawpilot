@@ -369,10 +369,11 @@ def build_publish_outcome(
 ) -> PublishOutcome:
     slug = slugify(artist_result.prompt_package.title)
     year = context.run_date[:4]
-    asset_repo_path = Path("public") / "gallery" / year / f"{context.run_date}-{slug}.png"
-    public_path = f"/gallery/{year}/{context.run_date}-{slug}.png"
+    run_id_suffix = context.run_id.split('-')[-1][:8]
+    asset_repo_path = Path("public") / "gallery" / year / f"{context.run_date}-{slug}-{run_id_suffix}.png"
+    public_path = f"/gallery/{year}/{context.run_date}-{slug}-{run_id_suffix}.png"
     image_record = GalleryImageRecord(
-        id=context.run_date,
+        id=context.run_id,
         title=artist_result.prompt_package.title,
         path=public_path,
         created_at=context.started_at,
