@@ -105,10 +105,21 @@ param gitAuthorName string = 'Art of Clawpilot Bot'
 param gitAuthorEmail string = 'artofclawpilot-bot@users.noreply.github.com'
 
 @description('Optional command executed inside the fresh clone before any commit/push step.')
-param hostedRunnerCommand string = 'python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE" --run-date "$RUN_DATE_UTC"'
+param hostedRunnerCommand string = 'python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE" --run-date "$RUN_DATE_UTC" --run-id "$RUN_ID"'
 
 @description('Optional fixed UTC run date injected into the hosted runner. Useful for hosted smoke and idempotency replay.')
 param hostedRunDateOverride string = ''
+
+@description('Optional run identifier for manual execution. Scheduled runs use runId=scheduled-{runDate}.')
+param hostedRunId string = ''
+
+@description('Trigger source for this execution: scheduled, manual-api, or manual-cli.')
+@allowed([
+  'scheduled'
+  'manual-api'
+  'manual-cli'
+])
+param hostedTriggerSource string = 'scheduled'
 
 @description('Whether the hosted bootstrap should push changes when the runner command mutates the clone.')
 param hostedPushChanges bool = false
@@ -282,14 +293,19 @@ var baseJobEnvVars = concat([
   }
 ] : [])
 
-var jobEnvVars = empty(hostedRunDateOverride)
-  ? baseJobEnvVars
-  : concat(baseJobEnvVars, [
-      {
-        name: 'RUN_DATE_UTC'
-        value: hostedRunDateOverride
-      }
-    ])
+var jobEnvVars = concat(baseJobEnvVars, !empty(hostedRunDateOverride) ? [{
+  name: 'RUN_DATE_UTC'
+  value: hostedRunDateOverride
+}] : [], [
+  {
+    name: 'RUN_ID'
+    value: !empty(hostedRunId) ? hostedRunId : ''
+  }
+  {
+    name: 'TRIGGER_SOURCE'
+    value: hostedTriggerSource
+  }
+])
 
 var baseJobConfiguration = {
   triggerType: jobTriggerType
