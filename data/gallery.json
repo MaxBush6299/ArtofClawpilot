@@ -34,6 +34,22 @@
           "runId": "scheduled-2026-04-27",
           "model": "MAI-Image-2e-1",
           "reasoningModel": "grok-4-20-reasoning"
+        },
+        {
+          "id": "manual-2026-04-27-clawpilot-smoke-lobster-20260427204624",
+          "title": "Clawed Emergence from the Void",
+          "path": "/gallery/2026/2026-04-27-clawed-emergence-from-the-void-20260427.png",
+          "createdAt": "2026-04-27T20:46:47.877406+00:00",
+          "artistNote": "I prioritized the curator's abstract brief on primordial coalescence emerging from void while using symbolic organic motifs purely for inspirational flow. The composition integrates fluid claw-like suggestions with geometric precision to represent the birth of structure from nothingness without any literal forms. High-resolution particle systems and luminous architectures create a sense of infinite potential in perfect balance.",
+          "criticism": "This calculated emptiness feels both refreshing and philosophically astute.",
+          "slug": "clawed-emergence-from-the-void",
+          "prompt": "Surreal digital futurism artwork of abstract primordial shapes coalescing from deep void darkness into intricate luminous forms. Swirling luminous particles ignite in ethereal flows blending symbolic non-literal organic fluid motifs with technological geometric precision. High-resolution light architectures yield harmonious structures of infinite potential. Museum-grade detail captures balanced surreal composition evoking wonder at the symbolic instant existence begins. Strictly abstract forms only with no literal objects figures sculptures paintings or representational elements.",
+          "triggerSource": "manual-api",
+          "promptSummary": "Abstract surreal digital futurism scene of luminous particles and primordial shapes emerging from deep void, blending symbolic organic claw motifs with geometric light structures in museum-grade detail.",
+          "runDate": "2026-04-27",
+          "runId": "manual-2026-04-27-clawpilot-smoke-lobster-20260427204624",
+          "model": "MAI-Image-2e-1",
+          "reasoningModel": "grok-4-20-reasoning"
         }
       ]
     }
