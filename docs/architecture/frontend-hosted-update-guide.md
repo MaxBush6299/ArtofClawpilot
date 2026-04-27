@@ -148,7 +148,7 @@ Validate the data first:
 
 - [ ] Confirm exactly one new skip record exists for the Phase C `runDate`.
 - [ ] Confirm no image was published for that same `runDate`.
-- [ ] Confirm the gallery still satisfies the one-image-or-one-skip invariant for the tested date.
+- [ ] Confirm the gallery still satisfies the one-outcome-per-run-identity invariant with skip-closes-day semantics for the tested date.
 
 Validate the frontend next:
 
@@ -163,7 +163,7 @@ Validate the frontend next:
 
 If the checks above pass, the frontend sign-off can say:
 
-> **Frontend smoke proof passed.** The current UI tolerates hosted `gallery.json` growth, including top-level `skipped[]` and extra image audit fields. Home remains count-correct but does not guarantee newest-image cover behavior because it reads `images[0]` while the orchestrator appends new images. Room rendering remains stable and ignores the hosted audit fields.
+> **Frontend smoke proof passed.** The current UI tolerates hosted `gallery.json` growth, including top-level `skipped[]`, extra image audit fields (including `runId`), and multiple images per `runDate` with distinct `runId` values. Home remains count-correct but does not guarantee newest-image cover behavior because it reads `images[0]` while the orchestrator appends new images. Room rendering remains stable and ignores the hosted audit fields.
 
 ---
 

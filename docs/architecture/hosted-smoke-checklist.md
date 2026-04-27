@@ -77,7 +77,7 @@ Purpose: prove the real container, managed identity, Key Vault references, GitHu
 
 ## Phase B — durable publish and idempotent rerun proof
 
-Purpose: prove the real hosted path can create one durable outcome and then cleanly no-op on the same `runDate`.
+Purpose: prove the real hosted path can create one durable outcome and then cleanly no-op on the same `runId`.
 
 ### Deploy/profile
 
@@ -91,7 +91,7 @@ Purpose: prove the real hosted path can create one durable outcome and then clea
 
 1. Start the job manually once.
 2. Confirm the smoke branch receives exactly one commit for `2099-02-11`.
-3. Start the same job again with the same `hostedRunDateOverride`.
+3. Start the same job again with the same `hostedRunDateOverride` and `runId` value (using the same fixtures so the `runId` is stable).
 
 ### Must-see evidence
 
@@ -106,7 +106,7 @@ Second execution:
 
 - orchestrator `already_resolved`
 - final call counts show no additional model/image calls after resolution
-- no second smoke commit for `2099-02-11`
+- no second smoke commit for `2099-02-11` with same `runId`
 
 ## Phase C — durable failure-path proof
 
@@ -139,7 +139,7 @@ Do not switch hosted execution to the scheduler on `main` until all of the follo
 
 1. The local dry-run matrix from `docs/architecture/hosted-validation-gates.md` has been completed.
 2. Phase A proves managed identity, Key Vault, GitHub App auth, container command, and orchestrator startup on the real ACA Job.
-3. Phase B proves one durable publish on the smoke branch and a same-day idempotent rerun no-op.
+3. Phase B proves one durable publish on the smoke branch and a same-`runId` idempotent rerun no-op.
 4. Phase C proves one hosted failure path becomes the expected structured skip contract.
 5. Wendy signs off that frontend reads still tolerate `skipped[]` plus optional audit fields.
 6. Butters signs off on the collected dry-run + hosted evidence.

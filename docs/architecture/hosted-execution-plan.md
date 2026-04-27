@@ -39,7 +39,7 @@ Butters's acceptance bar for #11 and #15 now lives in [`hosted-validation-gates.
 ## Implementation notes that should stay explicit
 
 1. Artist is a bounded flow: `grok-4-20-reasoning` call 1 analyzes inputs, call 2 drafts the prompt package, call 3 reviews/finalizes it, then one `MAI-Image-2e` generation call executes.
-2. Validation is shared infrastructure, not a last-minute test-only layer: preflight, post-run, asset-path, malformed-model-output, and one-outcome-per-day checks all live under #11 and are reused by #6 and #15.
+2. Validation is shared infrastructure, not a last-minute test-only layer: preflight, post-run, asset-path, malformed-model-output, and run-identity-scoped idempotency checks all live under #11 and are reused by #6 and #15.
 3. Per Microsoft Learn, deployment names are runtime config and hosted auth should use managed identity / Microsoft Entra ID rather than stored API keys; the hosted env should carry separate reasoning and MAI endpoints so the two API surfaces stay explicit.
 4. The hosted platform shell remains the GitHub App bootstrap, but its default hosted command must be the Python orchestrator (`python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE"`) so #6 runs through the containerized path by default.
 

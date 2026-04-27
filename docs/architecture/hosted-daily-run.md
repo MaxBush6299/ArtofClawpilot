@@ -18,12 +18,12 @@ All Microsoft-specific implementation work for this design should be grounded in
 
 ## Problem statement
 
-The current daily run is not hostable because the runtime contract lives inside an interactive Copilot CLI flow. Infra cannot provision a stable execution surface, backend work has no concrete runtime boundary for role logic, and test work cannot validate the one-outcome-per-day invariant independently of a desktop session.
+The current daily run is not hostable because the runtime contract lives inside an interactive Copilot CLI flow. Infra cannot provision a stable execution surface, backend work has no concrete runtime boundary for role logic, and test work cannot validate the run-identity-scoped idempotency invariant independently of a desktop session.
 
 The hosted design needs to:
 
 - remove runtime dependence on `copilot --agent squad`
-- keep the daily invariant: exactly one new image or exactly one structured skip record per run date
+- keep the run-identity invariant: exactly one new image or exactly one structured skip record per unique run identity (via `runId`), while allowing multiple images per calendar day with distinct `runId` values
 - keep GitHub as the published source of truth for `data/*.json` and `public/gallery/*`
 - separate infrastructure, orchestration, Foundry, GitHub, and deployment ownership cleanly
 
@@ -78,7 +78,7 @@ orchestrator/
 3. The job shell (`node scripts/hosted-bootstrap.mjs`) mints a GitHub App installation token, clones a fresh workspace, and runs `python3 -m orchestrator.main --repo-root "$REPO_WORKSPACE"` inside that checkout.
 4. The orchestrator loads config from explicit environment variables / CLI args, reads secrets from Key Vault, and resolves the current logical `runDate` in UTC.
 5. The orchestrator validates `data/gallery.json`, `data/critiques.json`, and `data/next-brief.json`.
-6. The orchestrator checks idempotency: if `runDate` already appears as a published image or skip record, the run exits cleanly without mutation.
+6. The orchestrator checks idempotency: if the provided `runId` already appears in the gallery (published image) or skip records, the run exits cleanly without mutation. If `runDate` has a skip record (from any prior run identity), the day is considered closed and the run exits before any model call.
 7. The Curator step uses the deployed `grok-4-20-reasoning` reasoning deployment to select the target room and emit the structured brief for today.
 8. If a prior published image exists, the Critic step uses `grok-4-20-reasoning` to write a critique of that latest piece and a suggestion that can influence the next brief.
 9. The Artist step assembles the final image brief and calls the `MAI-Image-2e` deployment by managed identity for image generation.
@@ -95,7 +95,8 @@ orchestrator/
 The orchestrator requires these inputs at run start:
 
 - repo target: GitHub owner, repo, branch (`main`)
-- run date: UTC calendar date used as the idempotency key
+- run date: UTC calendar date (used for grouping and asset naming; may have multiple images with distinct run identities)
+- run identity: unique run identifier (e.g., `scheduled-{runDate}` for scheduled runs, or `manual-{runDate}-{uuid}` for manual API runs) used as the idempotency key
 - persisted state: `data/gallery.json`, `data/critiques.json`, `data/next-brief.json`
 - reasoning model config: Azure OpenAI-compatible reasoning endpoint, `grok-4-20-reasoning` deployment name, API version
 - image model config: MAI image-generation endpoint, `MAI-Image-2e` deployment name, image settings
@@ -116,10 +117,10 @@ Deployment names, not raw model names, should be treated as runtime config becau
 
 ### Success contract
 
-A successful published run must create exactly these durable effects for the given `runDate`:
+A successful published run must create exactly these durable effects for the given `runId`:
 
 1. one new image file under `public/gallery/`
-2. one new image metadata entry appended to exactly one room in `data/gallery.json`
+2. one new image metadata entry appended to exactly one room in `data/gallery.json` (with `runId` included)
 3. zero new skip records for that same `runDate`
 4. optional supporting updates in `data/critiques.json` and `data/next-brief.json`
 5. one commit pushed to `main`
@@ -127,12 +128,13 @@ A successful published run must create exactly these durable effects for the giv
 Recommended asset path pattern:
 
 ```text
-public/gallery/YYYY/YYYY-MM-DD-<slug>.png
+public/gallery/YYYY/YYYY-MM-DD-{runId-suffix}.png
 ```
 
 Required image metadata fields in `data/gallery.json`:
 
-- `id`: stable run-scoped identifier, for example `2026-04-24`
+- `id`: stable run-scoped identifier, for example `img-2026-04-24`
+- `runId`: unique run identity (e.g., `scheduled-2026-04-24` or `manual-2026-04-24-abc123`)
 - `title`
 - `path`
 - `createdAt`
@@ -145,11 +147,11 @@ Required image metadata fields in `data/gallery.json`:
 
 ### Structured skip contract
 
-A structured skip is the durable fallback when orchestration completes but the system intentionally decides not to publish an image for that `runDate`. A skip must create exactly these durable effects:
+A structured skip is the durable fallback when orchestration completes but the system intentionally decides not to publish an image for that `runId`. A skip must create exactly these durable effects:
 
 1. no new file under `public/gallery/`
-2. one new skip record in `data/gallery.json`
-3. no new image metadata entry for that `runDate`
+2. one new skip record in `data/gallery.json` (with `runId` included)
+3. no new image metadata entry for that `runId`
 4. one commit pushed to `main`
 
 Recommended top-level addition to `data/gallery.json`:
@@ -165,6 +167,7 @@ Recommended top-level addition to `data/gallery.json`:
 Required skip fields:
 
 - `id`: stable run-scoped identifier, for example `skip-2026-04-24`
+- `runId`: unique run identity that was skipped (e.g., `scheduled-2026-04-24` or `manual-2026-04-24-abc123`)
 - `runDate`
 - `stage`: `curator`, `critic`, `artist`, or `publish`
 - `reasonCode`: controlled value such as `foundry_generation_failed`, `content_filtered`, `validation_failed`
@@ -189,11 +192,12 @@ The system invariant is day-scoped, not process-scoped: the canonical repo histo
 
 To enforce that invariant:
 
-- the orchestrator uses `runDate` as the primary idempotency key
-- both image ids and skip ids derive from `runDate`
+- the orchestrator uses `runId` as the primary idempotency key
+- both image ids and skip ids are scoped by `runId`
 - the job checks the repo before any mutation
-- retries are allowed only when no durable outcome exists yet
-- if a prior attempt already wrote the day outcome, later attempts exit cleanly and do not write again
+- retries of the same `runId` are allowed and exit as `already_resolved` with no model calls
+- distinct `runId` values on the same `runDate` are permitted and each produces a separate publish outcome
+- if a skip record exists for the `runDate`, all further runs for that day exit `day_already_closed` before any model call, regardless of `runId`
 
 ## Failure behavior
 
@@ -227,6 +231,7 @@ Recommended log fields:
 - `phase` (`config`, `pre_run`, `validation`, `git`, `curator`, `critic`, `artist`, `image_generation`, `publish`, `result`)
 - `event`
 - `runDate`
+- `runId`
 - `traceId`
 - phase-specific diagnostics such as `reasonCode`, `exitCode`, `changedPaths`, `responseId`, and call counts
 
@@ -247,13 +252,13 @@ The hosted runner should emit one structured JSON log line per significant event
 
 - `component`: `hosted-bootstrap` or `orchestrator`
 - `phase`: `config`, `pre_run`, `curator`, `critic`, `artist`, `publish`, `git`, `runner`, or `auth`
-- `event`: stable event name such as `run_started`, `reasoning_call_completed`, `failure_classified`, `write_set_validated`, or `push_completed`
-- `runDate` and `traceId` for correlation across bootstrap and orchestrator logs
+- `event`: stable event name such as `run_started`, `reasoning_call_completed`, `failure_classified`, `write_set_validated`, `already_resolved`, or `push_completed`
+- `runDate`, `runId`, and `traceId` for correlation across bootstrap and orchestrator logs
 - failure fields when relevant (`reasonCode`, `errorCode`, `exitCode`, `retryable`)
 
 This shape keeps the log body readable in raw ACA Job log streams while also making KQL filters straightforward in `ContainerAppConsoleLogs_CL`.
 
-For parity, the bootstrap shell should stamp the same `runDate`, `traceId`, and ACA execution metadata onto its own JSON logs and forward that `traceId` into `python -m orchestrator.main` (for example via `HOSTED_TRACE_ID`). Bootstrap `run_failed` records should also include machine-usable failure fields such as `errorCode`, `exitCode`, `command`, and a redacted stderr/stdout excerpt so git/auth/bootstrap failures can be triaged without replaying the container locally.
+For parity, the bootstrap shell should stamp the same `runDate`, `runId`, `traceId`, and ACA execution metadata onto its own JSON logs and forward those into `python -m orchestrator.main` (for example via `HOSTED_TRACE_ID` and `HOSTED_RUN_ID`). Bootstrap `run_failed` records should also include machine-usable failure fields such as `errorCode`, `exitCode`, `command`, and a redacted stderr/stdout excerpt so git/auth/bootstrap failures can be triaged without replaying the container locally.
 
 ### Azure operator workflow
 

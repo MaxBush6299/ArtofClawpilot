@@ -12,7 +12,7 @@ This document gives Kyle a concrete validation target before the Python runtime 
 
 ## Non-negotiable release gates
 
-1. **One outcome per UTC run date:** exactly one published image or exactly one structured skip record, never both.
+1. **One outcome per run identity:** exactly one published image or exactly one structured skip record per unique `runId`, allowing multiple outcomes per `runDate` with distinct `runId` values.
 2. **Bounded Artist budget:** one run attempt may use at most three `grok-4-20-reasoning` Artist calls and one `MAI-Image-2e` generation call.
 3. **Reviewed prompt handoff:** image generation may consume only the final reviewed prompt package, not draft reasoning text.
 4. **Reusable validation surface:** the same validation module must be callable from orchestrator execution, dry-run verification, and hosted smoke proof.
@@ -26,12 +26,12 @@ This is Butters's pre-implementation approval bar for **#6: end-to-end Python or
 
 Kyle does not clear #6 until review evidence shows all of the following:
 
-1. **Single entrypoint:** one Python entrypoint resolves `runDate`, loads repo state, runs Curator/Critic/Artist in order, assembles exactly one typed outcome, validates it, and hands one write set to the hosted GitHub path.
-2. **Idempotent preflight:** if `runDate` is already published or skipped, the orchestrator exits cleanly before any model call, asset write, or git mutation.
-3. **Publish path:** a successful publish attempt yields one asset file, one image metadata entry in exactly one room, zero same-day skip records, and post-run validation success.
-4. **Structured skip path:** controlled role/image failures yield one skip record, zero asset writes, zero same-day image entries, and post-run validation success.
+1. **Single entrypoint:** one Python entrypoint resolves `runDate` and `runId`, loads repo state, runs Curator/Critic/Artist in order, assembles exactly one typed outcome, validates it, and hands one write set to the hosted GitHub path.
+2. **Idempotent preflight:** if `runId` is already published or skipped, the orchestrator exits cleanly with `already_resolved` before any model call, asset write, or git mutation. If `runDate` has a skip record from any prior run, the orchestrator exits cleanly with `day_already_closed` before any model call.
+3. **Publish path:** a successful publish attempt yields one asset file, one image metadata entry in exactly one room, zero skip records for the same `runId`, and post-run validation success.
+4. **Structured skip path:** controlled role/image failures yield one skip record, zero asset writes, zero image entries for the same `runId`, and post-run validation success.
 5. **Explicit failure phases:** logs and exit handling identify where the run stopped (`pre_run`, `curator`, `critic`, `artist`, `publish`) and whether the result was publish, skip, no-op, or hard failure.
-6. **Budget enforcement:** the orchestrator exposes final reasoning/image call counts and proves the Artist flow cannot exceed three reasoning calls or one image generation call for the same `runDate`.
+6. **Budget enforcement:** the orchestrator exposes final reasoning/image call counts and proves the Artist flow cannot exceed three reasoning calls or one image generation call for the same `runId`.
 7. **Reviewed prompt gate:** image generation consumes only the final reviewed package; draft/analyze payloads are never passed directly to `MAI-Image-2e`.
 
 ### Highest-risk gaps in the current repo
@@ -64,11 +64,11 @@ Pre-run validation must happen before any model call or git mutation.
 | Check | Pass condition | Failure class |
 | --- | --- | --- |
 | `data/gallery.json` shape | valid JSON, `version`, `rooms[]`, optional `skipped[]`, unique room ids | hard fail |
-| existing day resolution | `runDate` is absent from all room images and all skip records | clean no-op |
-| gallery invariant | no existing `runDate` appears as both image and skip | hard fail |
+| existing outcome resolution | `runId` is absent from all room images and all skip records; if `runDate` has skip, day is closed | clean no-op if duplicate `runId`, `day_already_closed` if day-skip exists |
+| gallery invariant | no image and skip record may share the same `runId`; one skip per `runDate` max (prevents multi-skip collision) | hard fail |
 | `data/critiques.json` shape | valid JSON with `entries[]` | hard fail |
 | `data/next-brief.json` shape | valid JSON with expected brief fields | hard fail |
-| runtime config | repo target, deployment names, API versions, and auth settings present | hard fail |
+| runtime config | repo target, deployment names, API versions, auth settings, and run identity present | hard fail |
 
 ### 2. Role-output validation
 
@@ -119,9 +119,9 @@ Budget overflow is a structured skip at `artist` stage with an explicit reason s
 
 | Outcome | Required durable effects | Rejection conditions |
 | --- | --- | --- |
-| publish | one new file under `public/gallery/`, one new image entry for exactly one room, zero new skip records for the same `runDate` | multiple assets, multiple image entries, any same-day skip, bad path, missing metadata |
-| skip | zero new gallery asset files, one new skip record for `runDate`, zero new image entries for the same `runDate` | any new asset, any same-day image entry, missing skip fields |
-| idempotent rerun | zero model calls after pre-run resolution check, zero repo mutation | any write or extra model call |
+| publish | one new file under `public/gallery/`, one new image entry for exactly one room (with `runId` included), zero new skip records for the same `runId` | multiple assets, multiple image entries for same `runId`, any same-`runId` skip, bad path, missing metadata |
+| skip | zero new gallery asset files, one new skip record for `runId`, zero new image entries for the same `runId` | any new asset, any same-`runId` image entry, missing skip fields |
+| idempotent rerun | zero model calls after pre-run resolution check, zero repo mutation (both `already_resolved` for duplicate `runId` and `day_already_closed` for skip) | any write or extra model call |
 
 Required published image metadata remains:
 
@@ -163,8 +163,10 @@ Minimum scenarios:
 | malformed Critic output | explicit contract failure becomes structured skip |
 | malformed Artist reviewed package | image generation is blocked and a structured skip is produced |
 | Artist call-budget overflow attempt | fourth reasoning call is refused and surfaced as contract failure |
-| already-resolved run date | clean no-op with zero new model calls after resolution check |
+| already-resolved run id | clean no-op with `already_resolved` status, zero new model calls after resolution check |
+| day-already-closed from skip | clean no-op with `day_already_closed` status, zero new model calls before any resolution detail |
 | corrupted pre-run JSON/config | hard fail before any model call |
+| multi-publish same day different runId | two distinct `runId` values publish both successfully for same `runDate` |
 
 Dry-run acceptance is not met unless those scenarios can be rerun repeatably from fixtures or deterministic stubs.
 
@@ -194,7 +196,7 @@ The manual hosted procedure remains documented in [`hosted-smoke-checklist.md`](
 Butters should reject cutover unless all of the following are true:
 
 - #11 lands one reusable validation module shared by orchestrator, dry-run, and hosted smoke.
-- #15 demonstrates every scenario in the dry-run coverage table.
+- #15 demonstrates every scenario in the dry-run coverage table, including multi-publish same-day scenarios.
 - Hosted smoke passes on real container/job wiring by following `hosted-smoke-checklist.md`.
-- Wendy signs off that the frontend tolerates `gallery.json` contract growth.
-- One-image-or-one-skip remains provable for every tested `runDate`.
+- Wendy signs off that the frontend tolerates `gallery.json` contract growth including multiple `runDate` images.
+- One-outcome-per-run-identity remains provable for every tested `runId`, with skip-closes-day for the entire `runDate`.
