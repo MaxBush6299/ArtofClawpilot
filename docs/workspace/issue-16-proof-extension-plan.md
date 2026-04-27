@@ -20,6 +20,21 @@ The existing `scripts/orchestrator_proof.py` provides deterministic dry-run vali
 
 Once Kyle's `runId` implementation is complete, extend `build_scenarios()` with the following multi-run proof scenarios:
 
+### BC-1: Legacy Image Preservation (Critical Regression Gate)
+```python
+Scenario(
+    "legacy-image-preservation",
+    "publish",
+    seed_legacy_image_then_new_publish,
+    0,
+    validate_legacy_preserved
+)
+```
+- Setup: Seed gallery with one pre-runId image (has `runDate`, no `runId` field)
+- Execute: Run orchestrator with `--run-id scheduled-2026-04-28`
+- Validation: Gallery contains BOTH the legacy image AND the new image
+- **Critical:** This test validates the deployed regression where "Primordial Coalescence" was overwritten by "Inaugural Hall: Dawn of Creation"
+
 ### MR-1: Scheduled Run Idempotency (existing behavior preserved)
 ```python
 Scenario(
@@ -106,6 +121,28 @@ Scenario(
 
 ## Validation Helper Functions
 
+### validate_legacy_preserved
+```python
+def validate_legacy_preserved(summary: dict) -> None:
+    gallery = load_gallery_state()
+    images_in_room = gallery.rooms[0].images
+    assert len(images_in_room) >= 2, "Gallery must contain legacy + new image"
+    
+    # Find legacy image (no runId field)
+    legacy_images = [img for img in images_in_room if img.run_id is None]
+    assert len(legacy_images) >= 1, "Legacy image was removed (BC-1 regression)"
+    
+    # Find new image (has runId field)
+    new_images = [img for img in images_in_room if img.run_id is not None]
+    assert len(new_images) >= 1, "New image was not added"
+    
+    # Verify legacy image is intact
+    legacy_img = legacy_images[0]
+    assert legacy_img.id is not None
+    assert legacy_img.title is not None
+    assert legacy_img.path is not None
+```
+
 ### validate_scheduled_idempotency
 ```python
 def validate_scheduled_idempotency(summary: dict) -> None:
@@ -158,6 +195,32 @@ def validate_distinct_assets(summary: dict) -> None:
 ```
 
 ## Seed Helper Functions
+
+### seed_legacy_image_then_new_publish
+```python
+def seed_legacy_image_then_new_publish(scenario_root: Path) -> None:
+    # Create gallery with one legacy image (no runId field)
+    legacy_gallery = {
+        "version": 1,
+        "rooms": [{
+            "id": "room-01",
+            "name": "Room I — Inaugural Hall",
+            "theme": "The opening room of the gallery. Where it all begins.",
+            "images": [{
+                "id": "2026-04-27",
+                "title": "Primordial Coalescence",
+                "path": "/gallery/2026/2026-04-27-primordial-coalescence.png",
+                "createdAt": "2026-04-27T15:17:16.805977+00:00",
+                "runDate": "2026-04-27",
+                # Note: no runId field (legacy format)
+            }]
+        }],
+        "skipped": []
+    }
+    gallery_path = scenario_root / "data" / "gallery.json"
+    gallery_path.parent.mkdir(parents=True, exist_ok=True)
+    gallery_path.write_text(json.dumps(legacy_gallery, indent=2))
+```
 
 ### seed_scheduled_run
 ```python

@@ -336,6 +336,8 @@ gh api repos/MaxBush6299/ArtofClawpilot/contents/data/gallery.json \
 - [ ] Gallery record contains `runId` and `triggerSource` fields
 - [ ] Idempotent rerun with same `runId` exits as `already_resolved`
 - [ ] Commit lands on main (or smoke branch for pre-production validation)
+- [ ] **Legacy preservation verified:** Pre-runId images remain in gallery.json after new publish (BC-1 gate)
+- [ ] **Asset files verified:** All PNG files referenced in gallery.json exist in public/gallery/ (no orphaned records)
 
 ### Optional (Nice to Have)
 

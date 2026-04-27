@@ -81,6 +81,15 @@ Ensure skip records still close the entire calendar day.
 | **LC-2** | Manual run logs | All phases show `runId=manual-{runDate}-{uuid}` | Missing `runId` |
 | **LC-3** | Concurrent runs | Distinct `traceId` and `runId` per execution | Logs conflated |
 
+### Category 6B: Backward Compatibility and Legacy Preservation
+
+| Test | Scenario | Expected Outcome | Rejection If... |
+|------|----------|------------------|-----------------|
+| **BC-1** | Existing pre-runId images in gallery | All existing images preserved in gallery.json after new publish | Any existing image removed |
+| **BC-2** | Legacy image effective_run_id() | Pre-runId images return fallback `id` value | Returns None or crashes |
+| **BC-3** | Mixed gallery rendering | Frontend displays both legacy (no runId) and new (with runId) images | Crashes or filters out legacy |
+| **BC-4** | Gallery array append behavior | New images appended to room.images[], not replacing array | Existing images overwritten |
+
 ### Category 7: Hosted Deployment Gate (End-to-End Close Gate)
 
 | Test | Scenario | Expected Outcome | Rejection If... |
@@ -255,18 +264,21 @@ Butters will **reject** the implementation if any of these conditions are true:
 6. **Frontend build failure:** `npm run build` fails after adding `runId` field
 7. **Missing log correlation:** Phase logs missing `runId` field
 8. **Deployed pipeline failure:** End-to-end hosted execution fails or generates no image
+9. **Legacy image loss:** Existing pre-runId gallery images removed during or after new publish (BC-1 failure)
+10. **Gallery overwrite:** New image replaces entire room.images[] instead of appending (BC-4 failure)
 
 ## Approval Criteria
 
 Butters will **approve** closure of #16 when:
 
-1. ✅ All 20 acceptance tests (SR-1 through HG-4) pass locally or hosted
+1. ✅ All 24 acceptance tests (SR-1 through BC-4) pass locally or hosted
 2. ✅ `npm run orchestrator:proof` extended matrix passes (includes multi-run scenarios)
 3. ✅ Frontend build remains green: `npm run build` exits 0
 4. ✅ Hosted smoke proof (Phase B/C extended) passes on `hosted-smoke` branch
 5. ✅ Deployed pipeline runs successfully and generates new gallery image
 6. ✅ Log Analytics shows complete phase progression with `runId` correlation
 7. ✅ No regression in existing scheduled run behavior
+8. ✅ **Legacy preservation verified:** Existing pre-runId images remain in gallery after new publish (BC-1 gate)
 
 ## Close Gate Evidence Required
 
