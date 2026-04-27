@@ -1,5 +1,7 @@
 # History - Tolkien
 
+# History - Tolkien
+
 ## Seed Context
 
 - Requested by Max Bush.
@@ -7,11 +9,15 @@
 - Stack: React + Vite frontend, Python orchestration/runtime, Azure Container Apps Jobs, Azure Key Vault, Microsoft Foundry, Azure Static Web Apps.
 - Current issue focus: #2, the hosted daily-run architecture and execution contract.
 
-## Historical Learnings Summary
+## Core Context
 
-**2026-04-24 foundation:** User-assigned managed identity for hosted daily runner; Key Vault + Foundry access moved to job rather than SWA. GitHub App installation token for git operations with ephemeral checkout. Hosted bootstrap contract: `node scripts/hosted-bootstrap.mjs` with Key Vault-backed secrets and AZURE_CLIENT_ID. Foundry endpoints separated: reasoning (Azure OpenAI chat surface) vs MAI image generation (`https://<resource>.services.ai.azure.com/mai/v1/images/generations`). Deployment names injected as runtime config (`FOUNDRY_REASONING_DEPLOYMENT`, `FOUNDRY_IMAGE_DEPLOYMENT`). Transport classification in `orchestrator/integrations/foundry.py` for auth, deployment, content-filter, malformed-response. Hosted diagnostics standardized on JSON log line per event from bootstrap + orchestrator for Log Analytics correlation. ACA Job manual-first with `jobTriggerType`, added `hostedRunDateOverride` for same-day replay proof. Smoke on disposable branch as cutover gate before scheduling main. ACA stack exists in `rg-evaldemo` (artclaw-daily-job, artclaw-acae, artclaw-job-mi, artclaw-logs). Container image published in `evalt1acr.azurecr.io/artofclawpilot-runner:latest`. Key Vault secret references require explicit `identity` field per secret. Live smoke reached hosted boundary; Log Analytics showed runner start, failed on missing GITHUB_APP_ID env var. Reasoning calls succeeded (grok-4-20-reasoning), MAI endpoint hard-failed without explicit api-version in URL. Git push failed with exitCode 128 permission denied—GitHub App lacked Contents:Write permission. Architecture explicitly assumes direct push to main, not PR workflow.
+**Role:** Tolkien owns Azure platform work: Container Apps Jobs, Key Vault, SWA, and hosted runtime wiring.
 
-## Recent Sessions (2026-04-27)
+**2026-04-24 Foundation:** Implemented user-assigned managed identity for hosted runner; moved Key Vault + Foundry access from SWA to job. GitHub App installation token for ephemeral git checkout. Bootstrap contract: node scripts/hosted-bootstrap.mjs with Key Vault secrets and AZURE_CLIENT_ID. Foundry endpoint separation (reasoning vs MAI image generation). Deployment names as runtime config. Transport classification in foundry.py for auth/deployment/content-filter/malformed-response. JSON log per event for Log Analytics correlation. Manual-first ACA Job with jobTriggerType and hostedRunDateOverride for same-day replay. Smoke on disposable branch as cutover gate before scheduling. Resources deployed in rg-evaldemo. Container image in evalt1acr. Live smoke reached hosted boundary; Log Analytics confirmed runner start; failed on missing GITHUB_APP_ID env var. Reasoning succeeded (grok-4-20-reasoning), MAI endpoint hard-failed without explicit api-version URL. Git push failed exitCode 128 (GitHub App lacking Contents:Write).
+
+**2026-04-27 (Pre-Session):** Team triage synthesis confirmed GitHub App permission gap. Approved recovery: fix permissions, proof on hosted-smoke branch, resume production after smoke Phase B passes. Executed live ACA Job after permissions fix: 79 seconds success, generated "Primordial Coalescence", bootstrapped GitHub App token, cloned main, Curator (1 call), Artist (3 + 1 image), all validations passed, git push succeeded (commit a57c085). Log Analytics showed complete phase progression. Butters rejected production promotion due to main-branch architecture violation; Phase B/C smoke proof on correct branch still needed. Prepared issue #16 deployment gate spec: new RUN_ID/TRIGGER_SOURCE params, Bicep updates, environment variable injection, orchestrator CLI expectations. Executed issue #16 deployed validation after Kyle's approved implementation: added Bicep parameters, built container image, updated ACA Job, executed job (83 seconds, "Inaugural Hall: Dawn of Creation"), captured evidence (runId in logs, git commit, gallery record). All close gate criteria satisfied.
+
+## Learnings (2026-04-27 Session)
 
 - Tolkien owns Azure platform work: Container Apps Jobs, Key Vault, SWA, and hosted runtime wiring.
 

@@ -1,5 +1,7 @@
 # History - Stan
 
+# History - Stan
+
 ## Seed Context
 
 - Requested by Max Bush.
@@ -7,7 +9,13 @@
 - Stack: React + Vite frontend, Python orchestration/runtime, Azure Container Apps Jobs, Azure Key Vault, Microsoft Foundry, Azure Static Web Apps.
 - Current issue focus: #2, the hosted daily-run architecture and execution contract.
 
-## Learnings
+## Core Context
+
+**2026-04-24 Sessions Summary:** Initialized team with South Park names. Reviewed backlog with issue #2 as gating contract. Drafted hosted-daily-run.md recommending Python orchestrator in ACA Job with Curator/Critic/Artist roles and day-scoped idempotency. Recommended GitHub App for git push to main and user-assigned managed identity for auth. Issue #2 has no blocking clarification; architecture grounds in Microsoft Learn (UTC cron for Jobs, Bicep managed identity support). Standardized on grok-4-20-reasoning for reasoning and MAI-Image-2e for images. GitHub App permission issue discovered during deployment: git push failed with exitCode 128 (Contents: Read & Write missing). Architecture confirmed to use direct push to main (not PR-based), not branch protection issue. Recommended recovery: fix permissions, proof on disposable hosted-smoke branch, then resume production cutover.
+
+**2026-04-27 (Pre-Session) Work:** Synthesized team triage findings. Added GitHub App permission prerequisites to hosted-daily-run.md docs. Refined Wendy's frontend-hosted-update-guide.md after Butters rejection (5 inaccuracies corrected: runDate day-key vs timestamp, Room.tsx truthy check vs chaining, JSON schema claim removed, Home cover assumption fixed, contract boundary clarified). Analyzed multi-run invariant: shift from day-scoped to run-scoped idempotency using runId as primary key. Recommended sequential API rollout path (Phase 1: scheduler, Phase 2: API layer) over parallel to reduce integration risk. Refactored four architecture docs for run-identity support (hosted-daily-run.md, hosted-execution-plan.md, hosted-validation-gates.md, hosted-smoke-checklist.md, frontend-hosted-update-guide.md). Fixed Kyle's blocking defect: changed image_id from run_date to run_id, added asset path runId-suffix to prevent collisions. Issue #16 (run identity refactor) successfully closed after Tolkien deployed validation with "Inaugural Hall: Dawn of Creation" image.
+
+## Learnings (2026-04-27 Session)
 
 - Team initialized on 2026-04-24 with South Park cast names.
 - 2026-04-24 backlog review: issue #2 is the gating contract; recommended flow is architecture first, then platform/auth foundation, then runner implementation, then validation/observability/docs/tests.
