@@ -29,4 +29,3 @@ Solution Engineer consultant for Art of Clawpilot.
 
 - **Preferred:** auto
 - **Rationale:** Coordinator picks by task. Use cost-efficient models for light doc scans/Q&A; use stronger models for longer demo or learning artifacts.
-

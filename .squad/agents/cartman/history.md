@@ -10,4 +10,3 @@
 ## Learnings
 
 - 2026-04-27: Added as a persistent team consultant at Max Bush's request. Use internal/dev-honest voice, cite Microsoft/Azure claims with official docs and dates, and produce reusable docs for solution-engineer workflows.
-
