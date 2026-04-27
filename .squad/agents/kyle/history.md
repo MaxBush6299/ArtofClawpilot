@@ -7,6 +7,16 @@
 - Stack: React + Vite frontend, Python orchestration/runtime, Azure Container Apps Jobs, Azure Key Vault, Microsoft Foundry, Azure Static Web Apps.
 - Current issue focus: #2, the hosted daily-run architecture and execution contract.
 
+## Core Context
+
+**Role:** Kyle owns Python orchestration, Foundry integration, and persisted runtime contracts. Responsible for issue #16 run identity refactor implementation and API rollout sizing.
+
+**Issue #16 Refactor:** Changed idempotency from single-`runDate` key to composite (`runDate`, `runId`). Added `runId` field to contracts, CLI args, bootstrap, and validation logic. Initial implementation (6e82793) rejected for blocking defect (`id=context.run_date` instead of `id=context.run_id`). Reviewer lockout applied (Kyle cannot revise). Stan fixed defect (f425cae, approved). Deployed successfully by Tolkien. Post-deployment regression: legacy image overwritten due to `effective_run_id()` mismatch. BC-1 backward-compatibility gate added. Manual restoration (afb67f9) recovered legacy image.
+
+**GitHub App Permission Fix:** Diagnosed exitCode 128 git push failure: GitHub App needed Contents:Write permission. Recommended fix in Option A (direct push to main) over PR-based redesign (Option B). Architecture review confirmed direct push preserves day-scoped idempotency invariant.
+
+**Multi-Run API Sizing:** Two options: (1) orchestrator-only (2-3 days: add `runId` contract, update idempotency, no infra changes), (2) full API integration (1-2 weeks: plus Function App, auth, rate limiting). Recommended sequence: prove Option 1 first, add API layer incrementally. Direct ACA Job invocation (not enqueue-first). Lock-free concurrency via `runId` atomicity. Cost: ~$0.04/month incremental (negligible).
+
 ## Learnings
 
 - Kyle owns Python orchestration, Foundry integration, and persisted runtime contracts.

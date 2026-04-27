@@ -7,6 +7,16 @@
 - Stack: React + Vite frontend, Python orchestration/runtime, Azure Container Apps Jobs, Azure Key Vault, Microsoft Foundry, Azure Static Web Apps.
 - Current issue focus: #2, the hosted daily-run architecture and execution contract.
 
+## Core Context
+
+**Role:** Butters is reviewer-capable and owns acceptance coverage for the daily run and hosted execution contract. Key gates: hosted smoke architecture (Phase A/B/C proof on disposable `hosted-smoke` branch), backward-compatibility validation (BC-1 legacy image preservation), multi-run testing matrices, and issue #16 run identity refactor approval.
+
+**Hosted Architecture:** Direct push to main (GitHub App with Contents:Write), one commit per `runDate` (publish or skip), idempotent rerun no-op behavior, JSONL structured logs with runDate/traceId. Smoke proof required on `hosted-smoke` branch before production cutover.
+
+**Issue #16 Status:** Run identity refactor from single-`runDate` idempotency to composite (`runDate`, `runId`). Kyle's initial implementation (6e82793) rejected due to blocking defect (`id=context.run_date`). Stan fixed defect (f425cae, approved). Tolkien executed deployed validation (execution `artclaw-daily-job-2pewehrfleuls-fgp1l2d`, commit e5c07c5). Post-deployment regression discovered: legacy image "Primordial Coalescence" (a57c085, pre-runId) overwritten by new image (e5c07c5) due to `effective_run_id()` mismatch. BC-1 backward-compatibility gate added. Restoration commit afb67f9 recovered legacy image; both now coexist. Issue #16 re-closed with BC-1 gate passing.
+
+**Test Coverage Ownership:** 20-test acceptance matrix for issue #16 (SR-1/SR-3, MR-1/MR-4, SK-1/SK-3, AC-1/AC-3, FT-1/FT-3, LC-1/LC-3, HG-1/HG-4). Multi-run testing gates (MR-1/MR-10) for API-triggered manual runs. Frontend guide accuracy verified with Stan. Smoke promotion gate (Phase B/C with idempotent rerun + failure-path proof on isolated branch). Live ACA proof verdict: permission fix working, smoke promotion incomplete (missing Phase B/C).
+
 ## Learnings
 
 - Butters is reviewer-capable and owns acceptance coverage for the daily run and hosted execution contract.
