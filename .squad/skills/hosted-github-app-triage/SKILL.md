@@ -58,8 +58,37 @@ git push origin hosted-smoke
 
 The smoke-branch gate protects production gallery state during proof. If permissions fail on `main`, it's a healthy enforcement — the fix is to honor the documented branch requirement, not bypass it. Once the smoke proof passes on the disposable branch, promotion to `main` with the scheduler enabled becomes the final cutover step.
 
+## Verification After Permission Fix
+
+After GitHub App permissions are corrected (Contents: Read & Write granted), verify the fix by checking:
+
+1. **Manual job execution succeeds**: `az containerapp job start` returns execution ID, status transitions from Running → Succeeded
+2. **Log Analytics shows complete flow**: Query `ContainerAppConsoleLogs_CL` for the execution and verify all expected events appear:
+   - `bootstrap.run_started` → `auth.token_acquired` → `git.clone_completed`
+   - `runner.command_started` → `orchestrator.run_started`
+   - All role phases (curator, critic/skip, artist)
+   - `validation.write_set_validated` → `git.commit_ready`
+   - **Critical:** `git.push_completed` with no errors
+3. **Commit lands on target branch**: Use `gh api repos/<owner>/<repo>/commits/<branch>` to verify the latest commit matches the execution timestamp and author (should be the bot name)
+4. **No exit code 128 or permission errors**: Bootstrap logs should not contain `git_push_failed` event
+
+## Success Indicators
+
+A healthy push completion log looks like:
+```json
+{
+  "phase": "git",
+  "event": "push_completed",
+  "changedPathCount": 3,
+  "changedPaths": ["data/gallery.json", "data/next-brief.json", "public/gallery/..."],
+  "timestamp": "...",
+  "jobExecutionName": "..."
+}
+```
+
 ## Art of Clawpilot Example
 
 - `docs/architecture/hosted-smoke-checklist.md`: Phase B requires `githubBranch=hosted-smoke`
 - `.squad/skills/manual-aca-job-smoke-gate/SKILL.md`: Anti-pattern is "Do not point hosted smoke commits at `main`"
 - `scripts/hosted-bootstrap.mjs`: emits structured `git_push_failed` logs with `exitCode` and redacted stderr
+- **2026-04-27 successful resolution:** Execution artclaw-daily-job-2pewehrfleuls-j3e3a2s completed end-to-end on main after GitHub App granted Contents: Write. Log Analytics confirmed `push_completed` event, commit a57c085117e892e4042743994e9b68c3e8f03d84 landed on main. Duration: 79 seconds, no errors or retries.
