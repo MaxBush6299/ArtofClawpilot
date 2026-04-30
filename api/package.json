@@ -6,8 +6,8 @@
   "main": "src/functions/*.js",
   "scripts": {
     "build": "npm run check",
-    "check": "node --check src/functions/internalGenerate.js && node --check src/lib/auth.js && node --check src/lib/config.js && node --check src/lib/gallery.js && node --check src/lib/jobs.js && node --check src/lib/validation.js && node --check test/validation.test.js && node --check test/gallery.test.js && node --check test/auth.test.js",
-    "test": "node test/validation.test.js && node test/gallery.test.js && node test/auth.test.js",
+    "check": "node --check src/functions/internalGenerate.js && node --check src/lib/auth.js && node --check src/lib/config.js && node --check src/lib/gallery.js && node --check src/lib/internalGenerateHandler.js && node --check src/lib/jobs.js && node --check src/lib/validation.js && node --check test/validation.test.js && node --check test/gallery.test.js && node --check test/auth.test.js && node --check test/internalGenerate.test.js",
+    "test": "node test/validation.test.js && node test/gallery.test.js && node test/auth.test.js && node test/internalGenerate.test.js",
     "start": "func start"
   },
   "dependencies": {
