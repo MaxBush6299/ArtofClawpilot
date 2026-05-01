@@ -66,6 +66,22 @@
           "runId": "manual-2026-05-01-manual-20260501-lobster-005",
           "model": "MAI-Image-2e-1",
           "reasoningModel": "grok-4-20-reasoning"
+        },
+        {
+          "id": "manual-2026-05-01-daily-20260501-piece",
+          "title": "Indigo Echoes: First Collection Assembly",
+          "path": "/gallery/2026/2026-05-01-indigo-echoes-first-collection-assembly-piece.png",
+          "createdAt": "2026-05-01T21:28:30.802549+00:00",
+          "artistNote": "This composition evolves the series by depicting the deliberate first assembly of suspended indigo glass works that symbolically echo the central holographic primordial form. Energy filaments propagate from the origin to engage the hall and additional pedestals, representing thematic spread while preserving strict abstraction. Warm golden light is balanced against cool collection glows to sustain the emergence narrative without dominance. Shallow DOF draws focus to the new suspended sculptures yet retains visibility of the holographic source in a harmonious surreal atmosphere.",
+          "criticism": "This luminous transition captures the sacred instant when potential becomes exhibited wonder.",
+          "slug": "indigo-echoes-first-collection-assembly",
+          "prompt": "In the Inaugural Hall featuring high ceilings, classical columns, and polished marble floors, warm golden window light filters through atmospheric haze interacting with cool luminous indigo/blue glows and ethereal particle flows without overpowering them. The central holographic abstract primordial sculpture on its pedestal emits propagating light patterns and energy filaments that engage the suspended indigo glass sculptures with copper accents. These abstract geometric and fluid forms symbolically echo the primordial coalescence. Cinematic shallow DOF focuses on the suspended collection pieces while keeping the origin visible. Museum-grade surreal digital futurism with high detail on glass translucency and metallic reflections. Strictly abstract symbolic motifs with no literal or representational elements.",
+          "triggerSource": "manual-api",
+          "promptSummary": "Inaugural Hall scene of first abstract indigo glass collection with central holographic primordial sculpture emitting symbolic energy filaments, suspended copper-accented works, warm-to-cool light interplay, cinematic shallow DOF and high-detail translucency in surreal digital style.",
+          "runDate": "2026-05-01",
+          "runId": "manual-2026-05-01-daily-20260501-piece",
+          "model": "MAI-Image-2e-1",
+          "reasoningModel": "grok-4-20-reasoning"
         }
       ]
     }
