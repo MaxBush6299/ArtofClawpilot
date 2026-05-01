@@ -89,7 +89,24 @@
       "id": "room-02",
       "name": "Room II \u2014 Wall Works",
       "theme": "A quieter wing for self-contained paintings, panels, prints, and digital works inspired by historic art movements.",
-      "images": []
+      "images": [
+        {
+          "id": "manual-2026-05-01-manual-20260501-2248-wall-art-e2e",
+          "title": "Primordial Coalescence",
+          "path": "/gallery/2026/2026-05-01-primordial-coalescence-e2e.png",
+          "createdAt": "2026-05-01T22:45:25.898856+00:00",
+          "artistNote": "This inaugural Wall Works piece captures primordial emergence through pure symbolic abstraction on a self-contained canvas. It originally synthesizes the requested historic movements into a harmonious composition of light bursts, fluid transitions and intricate motifs without any representational forms. The rich textures and palette create contemplative depth suitable for quiet gallery display. Viewers sense infinite potential arising from voids while the work remains entirely non-literal.",
+          "criticism": "This luminous transition captures the sacred instant when potential becomes exhibited wonder.",
+          "slug": "primordial-coalescence",
+          "prompt": "Museum-quality standalone canvas painting, strictly abstract symbolic representation of primordial coalescence and emergence. Harmoniously fuses Klimt ornate gold patterns and symbolic depth, Monet luminous impressionist color transitions from deep indigo voids into soft pastels, Kandinsky vibrant geometric abstraction, Hokusai dynamic fluid flows, and Art Nouveau sinuous organic lines. Luminous particles and gold highlights burst from dark voids into layered geometric-organic motifs evoking infinite potential and birth of complexity. Rich textures, balanced composition with movement and depth, restricted palette of warm golds, deep indigos, luminous highlights and soft pastels. Pure abstraction with zero literal objects, figures, sculptures, text, frames, rooms or representational elements.",
+          "triggerSource": "manual-api",
+          "promptSummary": "Abstract museum-quality canvas painting fusing Klimt, Monet, Kandinsky, Hokusai and Art Nouveau styles to symbolize primordial coalescence via luminous particles, fluid forms and motifs in indigos, golds and pastels with no representational elements.",
+          "runDate": "2026-05-01",
+          "runId": "manual-2026-05-01-manual-20260501-2248-wall-art-e2e",
+          "model": "MAI-Image-2e-1",
+          "reasoningModel": "grok-4-20-reasoning"
+        }
+      ]
     }
   ],
   "skipped": [
