@@ -50,6 +50,22 @@
           "runId": "manual-2026-04-27-clawpilot-smoke-lobster-20260427204624",
           "model": "MAI-Image-2e-1",
           "reasoningModel": "grok-4-20-reasoning"
+        },
+        {
+          "id": "manual-2026-05-01-manual-20260501-lobster-005",
+          "title": "Holographic Primordial Manifestation",
+          "path": "/gallery/2026/2026-05-01-holographic-primordial-manifestation-005.png",
+          "createdAt": "2026-05-01T20:56:35.192536+00:00",
+          "artistNote": "This composition manifests the critical transition from prior void coalescence imagery into the first exhibited holographic reality within the inaugural hall, preserving strict thematic continuity. Symbolic non-literal textural enrichment evokes emergence motifs while adhering rigorously to abstraction, with shallow DOF directing all symbolic depth toward the luminous sculpture. Warm atmospheric lighting heightens the museum-grade wonder of concept-to-reality without introducing any representational figures, objects or literal forms. The result balances imposing architectural realism against surreal digital futurism to sustain the series' conceptual mystery.",
+          "criticism": null,
+          "slug": "holographic-primordial-manifestation",
+          "prompt": "Museum inaugural hall with imposing classical columns, vaulted ceilings and polished marble floors bathed in warm golden hour light from tall windows with ocean-like atmospheric haze. Solitary pedestal holds tangible holographic sculpture of abstract luminous primordial form coalescing geometric and fluid structures, enriched only by symbolic non-literal claw-inspired textural motifs for emergence. Cinematic shallow DOF sharply focuses on the ethereal high-res sculpture to evoke profound wonder at the void-to-reality transition while softly rendering the architecture. Strict museum-grade realism balanced with surreal digital futurism, preserving thematic continuity with no literal elements.",
+          "triggerSource": "manual-api",
+          "promptSummary": "Holographic abstract primordial sculpture coalesces on a pedestal within a sunlit inaugural hall, using shallow DOF and symbolic textural motifs to capture the wondrous void-to-reality transition in balanced realism and futurism.",
+          "runDate": "2026-05-01",
+          "runId": "manual-2026-05-01-manual-20260501-lobster-005",
+          "model": "MAI-Image-2e-1",
+          "reasoningModel": "grok-4-20-reasoning"
         }
       ]
     }
