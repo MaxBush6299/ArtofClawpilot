@@ -86,5 +86,47 @@
       ]
     }
   ],
-  "skipped": []
+  "skipped": [
+    {
+      "id": "skip-manual-2026-05-01-manual-20260501-2239-safe-room-e2e",
+      "runDate": "2026-05-01",
+      "runId": "manual-2026-05-01-manual-20260501-2239-safe-room-e2e",
+      "stage": "publish",
+      "reasonCode": "room_capacity_exhausted",
+      "message": "All gallery rooms are at capacity; selected room room-01 already has 5 images.",
+      "createdAt": "2026-05-01T22:41:18.311691+00:00",
+      "retryable": false,
+      "error": {
+        "code": "room_capacity_exhausted",
+        "message": "All gallery rooms are at capacity; selected room room-01 already has 5 images.",
+        "details": {
+          "selectedRoomId": "room-01",
+          "roomCapacity": 5,
+          "roomLoads": {
+            "room-01": 5
+          }
+        }
+      },
+      "triggerSource": "manual-api",
+      "creativeContext": {
+        "previousBrief": {
+          "day": 6,
+          "targetRoom": "room-01",
+          "styleRequest": "Cool-toned collection of suspended glass, copper, and indigo artworks",
+          "notes": "Cool-toned collection of suspended glass, copper, and indigo artworks"
+        },
+        "curatorPlan": {
+          "targetRoomId": "room-01",
+          "styleRequest": "Symbolic propagation of primordial energy filaments from holographic core interacting with hall architecture and suspended indigo glass collection",
+          "notes": "Continue inaugural hall narrative per critic suggestion on light patterns and energy spread; evolve from first collection assembly while preserving strict abstraction, thematic continuity, balanced warm/cool lighting, shallow DOF, and museum-grade surreal digital futurism",
+          "artistBrief": "In the Inaugural Hall with high ceilings, classical columns, and polished marble floors, warm golden window light filters through atmospheric haze interacting with cool luminous indigo/blue glows and ethereal particle flows. The central holographic abstract primordial sculpture on its pedestal emits subtle propagating light patterns and energy filaments that interact with the hall architecture, additional pedestals, and engage suspended indigo glass sculptures with copper accents. These abstract geometric and fluid forms symbolically represent the spread of primordial creation. Cinematic shallow DOF focuses on the propagating interactions while keeping the holographic origin visible. Museum-grade surreal digital futurism with high detail on light flows, glass translucency, and metallic reflections. Strictly abstract symbolic motifs with no literal or representational elements."
+        },
+        "room": {
+          "id": "room-01",
+          "name": "Room I \u2014 Inaugural Hall",
+          "theme": "The opening room of the gallery. Where it all begins."
+        }
+      }
+    }
+  ]
 }
