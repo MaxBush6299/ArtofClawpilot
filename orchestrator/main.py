@@ -14,6 +14,8 @@ from typing import Any
 
 from .contracts import (
     CriticReview,
+    CritiqueEntry,
+    CritiquesState,
     CuratorPlan,
     FailureCode,
     FailureStage,
@@ -393,6 +395,25 @@ def build_next_brief(previous_brief: NextBrief, gallery_after: GalleryState, cur
     )
 
 
+def has_persisted_critique(critiques: CritiquesState, critique_id: str) -> bool:
+    return any(entry.id == critique_id for entry in critiques.entries)
+
+
+def append_critique_if_new(critiques: CritiquesState, critique: CritiqueEntry | None) -> bool:
+    if critique is None:
+        return False
+    if has_persisted_critique(critiques, critique.id):
+        phase_log(
+            "validation",
+            "skipping duplicate critique append because the critique id already exists",
+            event="critique_append_no_op",
+            critiqueId=critique.id,
+        )
+        return False
+    critiques.entries.append(critique)
+    return True
+
+
 def build_publish_outcome(
     *,
     context: RunContext,
@@ -449,8 +470,7 @@ def apply_publish_outcome(
         raise ContractValidationError("post_run", "publish_room_missing", f"Room {outcome.room_id} does not exist.")
     target_room.images.append(outcome.image_record)
     updated_critiques = type(critiques).from_dict(critiques.to_dict())
-    if outcome.critique is not None:
-        updated_critiques.entries.append(outcome.critique)
+    append_critique_if_new(updated_critiques, outcome.critique)
     next_brief = build_next_brief(previous_brief, updated_gallery, curator_plan, critic_review)
     validate_gallery_state(updated_gallery)
     validate_critiques_state(updated_critiques)
@@ -463,8 +483,7 @@ def apply_skip_outcome(*, gallery: GalleryState, critiques, previous_brief: Next
     updated_gallery = GalleryState.from_dict(gallery.to_dict())
     updated_gallery.skipped.append(outcome.skip_record)
     updated_critiques = type(critiques).from_dict(critiques.to_dict())
-    if outcome.critique is not None:
-        updated_critiques.entries.append(outcome.critique)
+    append_critique_if_new(updated_critiques, outcome.critique)
     next_brief = outcome.next_brief or previous_brief
     validate_gallery_state(updated_gallery)
     validate_critiques_state(updated_critiques)
@@ -926,34 +945,31 @@ def execute_role_steps(args: RuntimeArgs, context: RunContext, gallery, critique
     latest_image = gallery.latest_image()
     critic_review: CriticReview | None = None
     if latest_image is not None:
-        phase_log("critic", "running Critic role", event="phase_started", latestImageId=latest_image.id)
-        try:
-            critic_review = critic.run(
-                context=context,
-                latest_image=latest_image,
-                critiques=critiques,
-                reasoning=reasoning_client,
+        if has_persisted_critique(critiques, latest_image.id):
+            phase_log(
+                "critic",
+                "skipping Critic role because the latest image already has a persisted critique",
+                event="phase_skipped",
+                latestImageId=latest_image.id,
+                critiqueId=latest_image.id,
+                reason="critique_already_persisted",
             )
-            evidence.critic_reasoning_calls = 1 if critic_review.usage is not None else 0
-            if critic_review.usage is not None:
-                log_reasoning_usage(critic_review.usage)
-            phase_log("critic", "Critic role completed", event="phase_completed", critiqueId=critic_review.critique.id)
-        except ContractValidationError as exc:
-            evidence.critic_reasoning_calls = 1
-            failure = map_contract_failure(FailureStage.CRITIC, exc)
-            log_role_failure(failure, outcome_kind="skip")
-            return build_skip_outcome(
-                context=context,
-                failure=failure,
-                creative_context=build_skip_creative_context(
-                    curator_plan=curator_plan,
+        else:
+            phase_log("critic", "running Critic role", event="phase_started", latestImageId=latest_image.id)
+            try:
+                critic_review = critic.run(
+                    context=context,
                     latest_image=latest_image,
-                ),
-            ), curator_plan, critic_review, evidence
-        except FoundryTransportError as exc:
-            evidence.critic_reasoning_calls = 1
-            failure = map_foundry_failure(FailureStage.CRITIC, exc)
-            if should_skip_from_failure(failure):
+                    critiques=critiques,
+                    reasoning=reasoning_client,
+                )
+                evidence.critic_reasoning_calls = 1 if critic_review.usage is not None else 0
+                if critic_review.usage is not None:
+                    log_reasoning_usage(critic_review.usage)
+                phase_log("critic", "Critic role completed", event="phase_completed", critiqueId=critic_review.critique.id)
+            except ContractValidationError as exc:
+                evidence.critic_reasoning_calls = 1
+                failure = map_contract_failure(FailureStage.CRITIC, exc)
                 log_role_failure(failure, outcome_kind="skip")
                 return build_skip_outcome(
                     context=context,
@@ -963,8 +979,21 @@ def execute_role_steps(args: RuntimeArgs, context: RunContext, gallery, critique
                         latest_image=latest_image,
                     ),
                 ), curator_plan, critic_review, evidence
-            log_role_failure(failure, outcome_kind="hard_fail")
-            raise OrchestratorError("critic", failure.reason_code.value, failure.message, exit_code=22) from exc
+            except FoundryTransportError as exc:
+                evidence.critic_reasoning_calls = 1
+                failure = map_foundry_failure(FailureStage.CRITIC, exc)
+                if should_skip_from_failure(failure):
+                    log_role_failure(failure, outcome_kind="skip")
+                    return build_skip_outcome(
+                        context=context,
+                        failure=failure,
+                        creative_context=build_skip_creative_context(
+                            curator_plan=curator_plan,
+                            latest_image=latest_image,
+                        ),
+                    ), curator_plan, critic_review, evidence
+                log_role_failure(failure, outcome_kind="hard_fail")
+                raise OrchestratorError("critic", failure.reason_code.value, failure.message, exit_code=22) from exc
     else:
         phase_log("critic", "skipping Critic role because no published image exists", event="phase_skipped")
 

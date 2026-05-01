@@ -21,12 +21,15 @@ Use this pattern when changing the hosted Python runner, persisted gallery contr
 - Keep fixture scenarios running through `python -m orchestrator.main` so dry-run proof and hosted logic share the same code path.
 - When you need repeatable proof, clone the repo into disposable workspace checkouts, seed only the persisted gallery files needed to reach the target path, and assert a dry run leaves the checkout diff unchanged afterward.
 - When acceptance requires role-specific negative coverage, confirm the fixture baseline can actually reach that role; an empty gallery needs a seeded sandbox or prior published image before Critic malformed-output scenarios count as covered.
+- Treat sidecar records such as critiques as idempotent append-only data: skip non-persistable role calls when the target sidecar ID already exists, but keep strict pre-run validation for real duplicate IDs already in persisted state.
 
 ## Examples
 - `orchestrator/validation.py`: `validate_pre_run_state`, `validate_publish_state_transition`, `validate_publish_write_set`, `validate_skip_write_set`
 - `orchestrator/main.py`: `build_skip_creative_context`, `build_skip_outcome`
 - `orchestrator/contracts.py`: `SkipError`, `SkipRecord`
 - `scripts/orchestrator_proof.py`: fixture matrix that seeds a prior image to force the Critic path, proves no-op reruns, and checks malformed-output / call-budget handling without touching the real repo state
+- `orchestrator/main.py`: `has_persisted_critique()` and `append_critique_if_new()` avoid duplicate Critic calls/appends while leaving `validate_critiques_state()` strict.
+- `scripts/orchestrator_proof.py`: `latest-image-already-critiqued-publish` proves publish continues with zero Critic calls; `duplicate-critiques-pre-run` proves persisted duplicate critique IDs still hard-fail.
 
 ## Anti-Patterns
 - Do not add ad hoc skip writes outside the orchestrator validation flow.

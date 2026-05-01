@@ -16,6 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = REPO_ROOT / "workspace" / "issue-15-proof"
 RUN_DATE = "2026-04-24"
 PREVIOUS_DAY = "2026-04-23"
+CRITIQUED_IMAGE_ID = "manual-2026-04-27-clawpilot-smoke-lobster-20260427204624"
+CRITIQUED_IMAGE_DATE = "2026-04-27"
 OVERLAY_PATHS = ("orchestrator", "scripts", "data", "public", "package.json")
 
 
@@ -76,6 +78,8 @@ def build_scenarios() -> list[Scenario]:
         Scenario("malformed-artist-review", "malformed-artist-review", seed_publish_ready_repo, 0, validate_malformed_artist_review),
         Scenario("artist-call-budget-overflow", "artist-call-budget-overflow", seed_publish_ready_repo, 0, validate_artist_budget_overflow),
         Scenario("already-resolved-no-op", "publish", seed_same_day_publish, 0, validate_already_resolved),
+        Scenario("latest-image-already-critiqued-publish", "publish", seed_latest_image_already_critiqued, 0, validate_latest_image_already_critiqued_publish),
+        Scenario("duplicate-critiques-pre-run", "publish", seed_duplicate_critiques, 11, validate_duplicate_critiques_hard_fail),
         Scenario("corrupted-pre-run-gallery", "publish", seed_corrupted_gallery, 11, validate_pre_run_hard_fail),
     ]
 
@@ -202,11 +206,30 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def reset_repo_state(repo_root: Path) -> None:
+    gallery = read_json(repo_root / "data" / "gallery.json")
+    for room in gallery.get("rooms", []):
+        room["images"] = []
+    gallery["skipped"] = []
+    write_json(repo_root / "data" / "gallery.json", gallery)
+    write_json(repo_root / "data" / "critiques.json", {"entries": []})
+    write_json(
+        repo_root / "data" / "next-brief.json",
+        {
+            "day": 1,
+            "targetRoom": "room-01",
+            "styleRequest": "luminous museum realism",
+            "notes": "Create a proof-ready gallery piece.",
+        },
+    )
+
+
 def seed_empty_repo(repo_root: Path) -> None:
-    return None
+    reset_repo_state(repo_root)
 
 
 def seed_publish_ready_repo(repo_root: Path) -> None:
+    reset_repo_state(repo_root)
     gallery = read_json(repo_root / "data" / "gallery.json")
     room = gallery["rooms"][0]
     room["images"].append(
@@ -254,7 +277,67 @@ def seed_same_day_publish(repo_root: Path) -> None:
     write_json(repo_root / "data" / "gallery.json", gallery)
 
 
+def seed_latest_image_already_critiqued(repo_root: Path) -> None:
+    reset_repo_state(repo_root)
+    image_path = f"/gallery/{CRITIQUED_IMAGE_DATE[:4]}/{CRITIQUED_IMAGE_DATE}-clawed-emergence-from-the-void-20260427.png"
+    gallery = read_json(repo_root / "data" / "gallery.json")
+    room = gallery["rooms"][0]
+    room["images"].append(
+        {
+            "id": CRITIQUED_IMAGE_ID,
+            "title": "Clawed Emergence from the Void",
+            "path": image_path,
+            "createdAt": f"{CRITIQUED_IMAGE_DATE}T20:46:47.877406+00:00",
+            "artistNote": "Seeded image that already has a durable critique.",
+            "criticism": "A persisted critique already exists for this image.",
+            "promptSummary": "A seeded image mirroring the hosted duplicate-critique regression.",
+            "runDate": CRITIQUED_IMAGE_DATE,
+            "runId": CRITIQUED_IMAGE_ID,
+            "model": "MAI-Image-2e",
+            "reasoningModel": "grok-4-20-reasoning",
+            "slug": "clawed-emergence-from-the-void",
+            "prompt": "Seeded already-critiqued image prompt.",
+        }
+    )
+    write_json(repo_root / "data" / "gallery.json", gallery)
+    write_json(
+        repo_root / "data" / "critiques.json",
+        {
+            "entries": [
+                {
+                    "id": CRITIQUED_IMAGE_ID,
+                    "title": "Already Persisted Critique",
+                    "date": f"{CRITIQUED_IMAGE_DATE}T20:46:50+00:00",
+                    "imageRef": image_path,
+                    "themes": ["continuity", "regression-proof"],
+                    "body": "This critique is intentionally pre-persisted to prove the Critic role is not called twice for the same latest image.",
+                    "suggestion": "Continue without duplicating this critique.",
+                }
+            ]
+        },
+    )
+    asset_path = repo_root / Path(*image_path.lstrip("/").split("/"))
+    asset_path.parent.mkdir(parents=True, exist_ok=True)
+    if not asset_path.exists():
+        asset_path.write_bytes(_fixture_png_bytes())
+
+
+def seed_duplicate_critiques(repo_root: Path) -> None:
+    reset_repo_state(repo_root)
+    duplicate = {
+        "id": "duplicate-critique-proof",
+        "title": "Duplicate Critique Proof",
+        "date": f"{PREVIOUS_DAY}T00:00:00+00:00",
+        "imageRef": f"/gallery/{PREVIOUS_DAY[:4]}/{PREVIOUS_DAY}-duplicate-critique-proof.png",
+        "themes": ["validation", "strictness"],
+        "body": "This duplicate is intentionally invalid.",
+        "suggestion": "Reject duplicate critique identifiers.",
+    }
+    write_json(repo_root / "data" / "critiques.json", {"entries": [duplicate, dict(duplicate)]})
+
+
 def seed_corrupted_gallery(repo_root: Path) -> None:
+    reset_repo_state(repo_root)
     (repo_root / "data" / "gallery.json").write_text("{\n  \"version\": 1,\n  \"rooms\": [\n", encoding="utf-8")
 
 
@@ -331,6 +414,24 @@ def validate_already_resolved(summary: dict[str, object]) -> None:
     if record.get("outcome") != "publish":
         raise AssertionError(f"unexpected no-op outcome details: {record}")
     assert_run_summary(summary, outcome="no-op", curator=0, critic=0, artist=0, image=0)
+
+
+def validate_latest_image_already_critiqued_publish(summary: dict[str, object]) -> None:
+    find_log(summary, event="dry_run_validated", phase="publish")
+    record = find_log(summary, event="phase_skipped", phase="critic")
+    if record.get("reason") != "critique_already_persisted" or record.get("critiqueId") != CRITIQUED_IMAGE_ID:
+        raise AssertionError(f"unexpected Critic skip details: {record}")
+    if any(record.get("errorCode") == "critique_id_duplicate" for record in summary["logs"]):  # type: ignore[index]
+        raise AssertionError("already-critiqued latest image must not fail with critique_id_duplicate")
+    assert_run_summary(summary, outcome="publish", curator=1, critic=0, artist=3, image=1)
+
+
+def validate_duplicate_critiques_hard_fail(summary: dict[str, object]) -> None:
+    record = find_log(summary, event="run_failed", phase="pre_run")
+    if record.get("errorCode") != "critique_id_duplicate":
+        raise AssertionError(f"unexpected duplicate critique failure details: {record}")
+    if any(record.get("event") == "reasoning_call_completed" for record in summary["logs"]):  # type: ignore[index]
+        raise AssertionError("duplicate persisted critiques should fail before any model calls")
 
 
 def validate_pre_run_hard_fail(summary: dict[str, object]) -> None:
