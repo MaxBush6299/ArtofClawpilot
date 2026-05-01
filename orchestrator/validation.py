@@ -27,6 +27,7 @@ REPO_ASSET_RE = re.compile(r"^public[\\/]+gallery[\\/]+\d{4}[\\/]+\d{4}-\d{2}-\d
 SKIP_STAGE_VALUES = {"curator", "critic", "artist", "publish"}
 MAI_MIN_DIMENSION = 768
 MAI_MAX_TOTAL_PIXELS = 1_048_576
+ROOM_IMAGE_CAPACITY = 5
 IMAGE_FAILURE_REASON_CODES = {
     FailureCode.CONTENT_FILTERED.value,
     FailureCode.GENERATION.value,
@@ -94,7 +95,14 @@ def validate_gallery_state(state: GalleryState) -> None:
         _require(ROOM_ID_RE.match(room.id) is not None, "pre_run", "room_id_invalid", "room id must look like room-01", room_id=room.id)
         _require(room.id not in seen_room_ids, "pre_run", "room_id_duplicate", "duplicate room id", room_id=room.id)
         seen_room_ids.add(room.id)
-        _require(len(room.images) <= 5, "pre_run", "room_capacity_exceeded", "rooms may contain at most 5 images", room_id=room.id, count=len(room.images))
+        _require(
+            len(room.images) <= ROOM_IMAGE_CAPACITY,
+            "pre_run",
+            "room_capacity_exceeded",
+            f"rooms may contain at most {ROOM_IMAGE_CAPACITY} images",
+            room_id=room.id,
+            count=len(room.images),
+        )
         for image in room.images:
             validate_existing_image_record(image)
             _require(image.id not in seen_image_ids, "pre_run", "image_id_duplicate", "duplicate image id", image_id=image.id)

@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -45,6 +45,7 @@ from .validation import (
     validate_publish_outcome,
     validate_publish_state_transition,
     validate_publish_write_set,
+    ROOM_IMAGE_CAPACITY,
     validate_skip_write_set,
     validate_skip_outcome,
     validate_skip_state_transition,
@@ -60,6 +61,7 @@ DOMAIN_SKIP_CODES = {
     FailureCode.MALFORMED_OUTPUT,
     FailureCode.RESPONSE_SHAPE,
     FailureCode.VALIDATION,
+    FailureCode.CAPACITY,
 }
 GUIDING_DESCRIPTION_MAX_CHARS = 1000
 
@@ -379,6 +381,68 @@ def resolve_room(gallery: GalleryState, room_id: str) -> Any:
     return room
 
 
+def room_capacity_snapshot(gallery: GalleryState) -> dict[str, int]:
+    return {room.id: len(room.images) for room in gallery.rooms}
+
+
+def resolve_safe_target_room(gallery: GalleryState, curator_plan: CuratorPlan) -> tuple[CuratorPlan, Any, RoleFailure | None]:
+    selected_room = resolve_room(gallery, curator_plan.target_room_id)
+    selected_count = len(selected_room.images)
+    if selected_count < ROOM_IMAGE_CAPACITY:
+        phase_log(
+            "curator",
+            "selected room has capacity for this run",
+            event="room_capacity_validated",
+            targetRoomId=selected_room.id,
+            imageCount=selected_count,
+            roomCapacity=ROOM_IMAGE_CAPACITY,
+        )
+        return curator_plan, selected_room, None
+
+    available_rooms = sorted(
+        (room for room in gallery.rooms if len(room.images) < ROOM_IMAGE_CAPACITY),
+        key=lambda room: (len(room.images), room.id),
+    )
+    if available_rooms:
+        safe_room = available_rooms[0]
+        safe_plan = replace(curator_plan, target_room_id=safe_room.id)
+        phase_log(
+            "curator",
+            f"Curator selected full room {selected_room.id}; rolling over to safe room {safe_room.id}",
+            event="room_rollover",
+            selectedRoomId=selected_room.id,
+            targetRoomId=safe_room.id,
+            selectedRoomImageCount=selected_count,
+            targetRoomImageCount=len(safe_room.images),
+            roomCapacity=ROOM_IMAGE_CAPACITY,
+            roomLoads=room_capacity_snapshot(gallery),
+        )
+        return safe_plan, safe_room, None
+
+    failure = RoleFailure(
+        stage=FailureStage.PUBLISH,
+        reason_code=FailureCode.CAPACITY,
+        message=f"All gallery rooms are at capacity; selected room {selected_room.id} already has {selected_count} images.",
+        retryable=False,
+        details={
+            "selectedRoomId": selected_room.id,
+            "roomCapacity": ROOM_IMAGE_CAPACITY,
+            "roomLoads": room_capacity_snapshot(gallery),
+        },
+    )
+    phase_log(
+        "publish",
+        "all gallery rooms are at capacity; skipping before Critic, Artist, and image generation",
+        event="room_capacity_exhausted",
+        level="WARNING",
+        stream=sys.stderr,
+        selectedRoomId=selected_room.id,
+        roomCapacity=ROOM_IMAGE_CAPACITY,
+        roomLoads=room_capacity_snapshot(gallery),
+    )
+    return curator_plan, selected_room, failure
+
+
 def select_next_brief_room(gallery: GalleryState) -> str:
     ordered = sorted(gallery.rooms, key=lambda room: (len(room.images), room.id))
     return ordered[0].id if ordered else "room-01"
@@ -612,9 +676,9 @@ class FixtureReasoningClient:
             return (
                 {
                     "title": "Dry Run Radiance",
-                    "prompt": "Create a museum-grade painting of a radiant hall with strong geometry, quiet atmosphere, and luminous depth.",
+                    "prompt": "Create an original museum-grade abstract canvas of luminous geometric fields, layered color, and quiet atmospheric depth for wall display.",
                     "artistNote": "A dry-run stand-in that follows the hosted contract without external model calls.",
-                    "promptSummary": "A luminous geometric hall rendered as a calm museum-grade painting.",
+                    "promptSummary": "A luminous geometric abstract canvas rendered as a calm museum-grade wall artwork.",
                     "generation": {"width": 1024, "height": 1024},
                     "safetyNotes": ["fixture-only prompt package"],
                 },
@@ -637,10 +701,10 @@ class FixtureReasoningClient:
             {
                 "promptPackage": {
                     "title": "Dry Run Radiance",
-                    "prompt": "Create a museum-grade painting of a radiant hall with strong geometry, quiet atmosphere, and luminous depth.",
-                    "reviewedPrompt": "Create a museum-grade painting of a radiant hall with strong geometry, quiet atmosphere, and luminous depth.",
+                    "prompt": "Create an original museum-grade abstract canvas of luminous geometric fields, layered color, and quiet atmospheric depth for wall display.",
+                    "reviewedPrompt": "Create an original museum-grade abstract canvas of luminous geometric fields, layered color, and quiet atmospheric depth for wall display.",
                     "artistNote": "A dry-run stand-in that follows the hosted contract without external model calls.",
-                    "promptSummary": "A luminous geometric hall rendered as a calm museum-grade painting.",
+                    "promptSummary": "A luminous geometric abstract canvas rendered as a calm museum-grade wall artwork.",
                     "reviewStatus": "final-reviewed",
                     "generation": {"width": 1024, "height": 1024},
                     "safetyNotes": ["fixture-only prompt package"],
@@ -918,8 +982,26 @@ def execute_role_steps(args: RuntimeArgs, context: RunContext, gallery, critique
         evidence.curator_reasoning_calls = 1 if curator_plan.usage is not None else 0
         if curator_plan.usage is not None:
             log_reasoning_usage(curator_plan.usage)
-        room = resolve_room(gallery, curator_plan.target_room_id)
-        phase_log("curator", "Curator role completed", event="phase_completed", targetRoomId=curator_plan.target_room_id)
+        selected_room_id = curator_plan.target_room_id
+        curator_plan, room, capacity_failure = resolve_safe_target_room(gallery, curator_plan)
+        phase_log(
+            "curator",
+            "Curator role completed",
+            event="phase_completed",
+            selectedRoomId=selected_room_id,
+            targetRoomId=curator_plan.target_room_id,
+        )
+        if capacity_failure is not None:
+            log_role_failure(capacity_failure, outcome_kind="skip")
+            return build_skip_outcome(
+                context=context,
+                failure=capacity_failure,
+                creative_context=build_skip_creative_context(
+                    previous_brief=previous_brief,
+                    curator_plan=curator_plan,
+                    room=room,
+                ),
+            ), curator_plan, None, evidence
     except ContractValidationError as exc:
         evidence.curator_reasoning_calls = 1
         failure = map_contract_failure(FailureStage.CURATOR, exc)
@@ -1195,12 +1277,20 @@ def main() -> int:
                 curator_plan=curator_plan,
                 critic_review=critic_review,
             )
-            phase_log("validation", "publish transition passed validation", event="state_transition_validated", outcome="publish")
+            phase_log(
+                "validation",
+                "publish transition passed validation",
+                event="state_transition_validated",
+                outcome="publish",
+                roomId=outcome.room_id,
+                nextBriefTargetRoom=next_brief.target_room,
+            )
             if args.dry_run:
                 phase_log(
                     "publish",
                     f"dry run validated publish outcome for {outcome.image_record.path}",
                     event="dry_run_validated",
+                    roomId=outcome.room_id,
                     assetPath=outcome.asset_repo_path,
                     imagePath=outcome.image_record.path,
                 )
@@ -1236,6 +1326,7 @@ def main() -> int:
                 f"publish outcome ready for commit: {outcome.image_record.title}",
                 event="outcome_ready",
                 title=outcome.image_record.title,
+                roomId=outcome.room_id,
                 assetPath=outcome.asset_repo_path,
             )
             log_final_call_counts("publish", evidence)

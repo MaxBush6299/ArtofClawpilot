@@ -28,6 +28,7 @@ class FailureCode(StringEnum):
     API = "api_error"
     GENERATION = "foundry_generation_failed"
     RESPONSE_SHAPE = "response_shape_invalid"
+    CAPACITY = "room_capacity_exhausted"
 
 
 class OutcomeKind(StringEnum):

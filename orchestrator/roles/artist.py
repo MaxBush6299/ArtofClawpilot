@@ -5,18 +5,28 @@ from ..integrations.foundry import ReasoningClient, ReasoningStepRequest
 from ..validation import ContractValidationError, validate_artist_result
 from .parsing import optional_string_list, parse_generation_settings, require_object, require_string, require_string_list
 
-ANALYZE_PROMPT = """You are the Artist analysis step for Art of Clawpilot.
+ARTWORK_GUIDANCE = """Creative direction for every Artist step:
+- Generate an original gallery artwork intended for wall display: painting, panel, canvas, print, tapestry-like surface, fresco-like surface, or digital artwork.
+- Do not produce a photo/rendering of a statue, sculpture, pedestal object, product, building, room, architecture, or isolated physical object unless the curator explicitly requests that subject.
+- Let the work feel broadly inspired by rotating historical artists and movements such as Klimt, Monet, Van Gogh, O'Keeffe, Kandinsky, Hokusai, Kahlo, Rembrandt, Turner, Hilma af Klint, Bauhaus, Art Nouveau, Impressionism, and Surrealism.
+- Synthesize public-domain historical influences through mood, palette, composition, and technique; never copy an exact existing work, copyrighted character, brand, or living artist's style."""
+
+ANALYZE_PROMPT = f"""You are the Artist analysis step for Art of Clawpilot.
 Return JSON only.
 Analyze the curator brief, room context, and optional critic suggestion.
-Do not draft the final image prompt yet."""
+Do not draft the final image prompt yet.
+{ARTWORK_GUIDANCE}"""
 
-DRAFT_PROMPT = """You are the Artist drafting step for Art of Clawpilot.
+DRAFT_PROMPT = f"""You are the Artist drafting step for Art of Clawpilot.
 Return JSON only.
-Produce the candidate image prompt package for MAI-Image-2e."""
+Produce the candidate image prompt package for MAI-Image-2e.
+{ARTWORK_GUIDANCE}"""
 
-REVIEW_PROMPT = """You are the Artist review step for Art of Clawpilot.
+REVIEW_PROMPT = f"""You are the Artist review step for Art of Clawpilot.
 Return JSON only.
-Review the candidate prompt package, tighten it if needed, and finalize the package for one MAI-Image-2e call."""
+Review the candidate prompt package, tighten it if needed, and finalize the package for one MAI-Image-2e call.
+Reject or rewrite prompts that depict statues, products, architecture, rooms, or object photography unless explicitly requested.
+{ARTWORK_GUIDANCE}"""
 
 ANALYZE_CONTRACT = {
     "constraints": ["string"],
@@ -26,17 +36,17 @@ ANALYZE_CONTRACT = {
 
 DRAFT_CONTRACT = {
     "title": "string",
-    "prompt": "40-120 word string",
+    "prompt": "40-120 word string for an original wall-display artwork/panel/canvas/digital work, not object/architecture photography unless explicitly requested",
     "artistNote": "2-4 sentence string",
     "promptSummary": "1-2 sentence string",
     "generation": {"width": 1024, "height": 1024},
-    "safetyNotes": ["string"],
+    "safetyNotes": ["string including historical-inspiration/originality checks"],
 }
 
 REVIEW_CONTRACT = {
     "promptPackage": {
         **DRAFT_CONTRACT,
-        "reviewedPrompt": "40-120 word string",
+        "reviewedPrompt": "40-120 word final prompt for an original wall-display artwork, with object/statue/architecture outcomes removed unless explicitly requested",
         "reviewStatus": "final-reviewed",
     },
     "reviewNotes": ["string"],

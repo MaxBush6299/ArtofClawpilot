@@ -79,6 +79,8 @@ def build_scenarios() -> list[Scenario]:
         Scenario("artist-call-budget-overflow", "artist-call-budget-overflow", seed_publish_ready_repo, 0, validate_artist_budget_overflow),
         Scenario("already-resolved-no-op", "publish", seed_same_day_publish, 0, validate_already_resolved),
         Scenario("latest-image-already-critiqued-publish", "publish", seed_latest_image_already_critiqued, 0, validate_latest_image_already_critiqued_publish),
+        Scenario("selected-room-full-rollover", "publish", seed_selected_room_full_rollover, 0, validate_selected_room_full_rollover),
+        Scenario("all-rooms-full-zero-call-skip", "publish", seed_all_rooms_full, 0, validate_all_rooms_full_zero_call_skip),
         Scenario("duplicate-critiques-pre-run", "publish", seed_duplicate_critiques, 11, validate_duplicate_critiques_hard_fail),
         Scenario("corrupted-pre-run-gallery", "publish", seed_corrupted_gallery, 11, validate_pre_run_hard_fail),
     ]
@@ -322,6 +324,76 @@ def seed_latest_image_already_critiqued(repo_root: Path) -> None:
         asset_path.write_bytes(_fixture_png_bytes())
 
 
+def make_room(room_id: str, image_count: int, *, date_offset: int) -> dict:
+    return {
+        "id": room_id,
+        "name": f"Proof {room_id}",
+        "theme": f"Capacity proof room {room_id}",
+        "images": [make_seed_image(room_id, index, date_offset=date_offset + index) for index in range(image_count)],
+    }
+
+
+def make_seed_image(room_id: str, index: int, *, date_offset: int) -> dict:
+    image_date = f"2026-04-{date_offset:02d}"
+    image_id = f"{room_id}-capacity-seed-{index + 1}"
+    slug = f"{room_id}-capacity-seed-{index + 1}"
+    return {
+        "id": image_id,
+        "title": f"{room_id} Capacity Seed {index + 1}",
+        "path": f"/gallery/{image_date[:4]}/{image_date}-{slug}.png",
+        "createdAt": f"{image_date}T00:00:00+00:00",
+        "artistNote": "Seeded capacity proof image.",
+        "promptSummary": "A seeded proof image used to fill room capacity deterministically.",
+        "runDate": image_date,
+        "runId": image_id,
+        "model": "MAI-Image-2e",
+        "reasoningModel": "grok-4-20-reasoning",
+        "slug": slug,
+        "prompt": "Seeded capacity proof prompt.",
+    }
+
+
+def seed_selected_room_full_rollover(repo_root: Path) -> None:
+    reset_repo_state(repo_root)
+    gallery = read_json(repo_root / "data" / "gallery.json")
+    gallery["rooms"] = [
+        make_room("room-01", 5, date_offset=1),
+        make_room("room-02", 0, date_offset=10),
+        make_room("room-03", 2, date_offset=12),
+    ]
+    gallery["skipped"] = []
+    write_json(repo_root / "data" / "gallery.json", gallery)
+    write_json(
+        repo_root / "data" / "next-brief.json",
+        {
+            "day": 7,
+            "targetRoom": "room-01",
+            "styleRequest": "luminous museum realism",
+            "notes": "Select room-01 so the safe-room resolver must roll over before downstream calls.",
+        },
+    )
+
+
+def seed_all_rooms_full(repo_root: Path) -> None:
+    reset_repo_state(repo_root)
+    gallery = read_json(repo_root / "data" / "gallery.json")
+    gallery["rooms"] = [
+        make_room("room-01", 5, date_offset=1),
+        make_room("room-02", 5, date_offset=10),
+    ]
+    gallery["skipped"] = []
+    write_json(repo_root / "data" / "gallery.json", gallery)
+    write_json(
+        repo_root / "data" / "next-brief.json",
+        {
+            "day": 7,
+            "targetRoom": "room-01",
+            "styleRequest": "luminous museum realism",
+            "notes": "Select room-01 while every proof room is already full.",
+        },
+    )
+
+
 def seed_duplicate_critiques(repo_root: Path) -> None:
     reset_repo_state(repo_root)
     duplicate = {
@@ -424,6 +496,42 @@ def validate_latest_image_already_critiqued_publish(summary: dict[str, object]) 
     if any(record.get("errorCode") == "critique_id_duplicate" for record in summary["logs"]):  # type: ignore[index]
         raise AssertionError("already-critiqued latest image must not fail with critique_id_duplicate")
     assert_run_summary(summary, outcome="publish", curator=1, critic=0, artist=3, image=1)
+
+
+def validate_selected_room_full_rollover(summary: dict[str, object]) -> None:
+    rollover = find_log(summary, event="room_rollover", phase="curator")
+    if rollover.get("selectedRoomId") != "room-01" or rollover.get("targetRoomId") != "room-02":
+        raise AssertionError(f"unexpected room rollover details: {rollover}")
+    artist_start = find_log(summary, event="phase_started", phase="artist")
+    if artist_start.get("roomId") != "room-02":
+        raise AssertionError(f"Artist must receive the safe room id: {artist_start}")
+    publish_record = find_log(summary, event="publish_outcome_validated", phase="validation")
+    if publish_record.get("roomId") != "room-02":
+        raise AssertionError(f"publish outcome must use the safe room id: {publish_record}")
+    publish_start = find_log(summary, event="phase_started", phase="publish")
+    if publish_start.get("roomId") != "room-02":
+        raise AssertionError(f"publish transaction must use the safe room id: {publish_start}")
+    transition = find_log(summary, event="state_transition_validated", phase="validation")
+    if transition.get("roomId") != "room-02" or transition.get("nextBriefTargetRoom") != "room-02":
+        raise AssertionError(f"publish transition must carry the safe room into next brief selection: {transition}")
+    assert_run_summary(summary, outcome="publish", curator=1, critic=1, artist=3, image=1)
+
+
+def validate_all_rooms_full_zero_call_skip(summary: dict[str, object]) -> None:
+    capacity = find_log(summary, event="room_capacity_exhausted", phase="publish")
+    if capacity.get("selectedRoomId") != "room-01":
+        raise AssertionError(f"unexpected capacity skip details: {capacity}")
+    skip_record = find_log(summary, event="skip_outcome_validated", phase="validation")
+    if skip_record.get("reasonCode") != "room_capacity_exhausted" or skip_record.get("skipStage") != "publish":
+        raise AssertionError(f"unexpected all-full skip details: {skip_record}")
+    forbidden_phase_starts = [
+        record
+        for record in summary["logs"]  # type: ignore[index]
+        if record.get("event") == "phase_started" and record.get("phase") in {"critic", "artist", "image_generation"}
+    ]
+    if forbidden_phase_starts:
+        raise AssertionError(f"all-rooms-full skip must occur before downstream calls: {forbidden_phase_starts}")
+    assert_run_summary(summary, outcome="skip", curator=1, critic=0, artist=0, image=0)
 
 
 def validate_duplicate_critiques_hard_fail(summary: dict[str, object]) -> None:
