@@ -84,6 +84,12 @@
           "reasoningModel": "grok-4-20-reasoning"
         }
       ]
+    },
+    {
+      "id": "room-02",
+      "name": "Room II \u2014 Wall Works",
+      "theme": "A quieter wing for self-contained paintings, panels, prints, and digital works inspired by historic art movements.",
+      "images": []
     }
   ],
   "skipped": [
